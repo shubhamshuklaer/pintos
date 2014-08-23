@@ -21,6 +21,7 @@ threads_SRC += threads/synch.c		# Synchronization.
 threads_SRC += threads/palloc.c		# Page allocator.
 threads_SRC += threads/malloc.c		# Subpage allocator.
 threads_SRC += threads/start.S		# Startup code.
+threads_SRC += threads/thread_heap.c # heap implementation
 
 # Device driver code.
 devices_SRC  = devices/timer.c		# Timer device.
@@ -47,6 +48,7 @@ lib/kernel_SRC += lib/kernel/list.c	# Doubly-linked lists.
 lib/kernel_SRC += lib/kernel/bitmap.c	# Bitmaps.
 lib/kernel_SRC += lib/kernel/hash.c	# Hash tables.
 lib/kernel_SRC += lib/kernel/console.c	# printf(), putchar().
+
 
 # User process code.
 userprog_SRC  = userprog/process.c	# Process loading.
