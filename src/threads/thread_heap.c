@@ -96,6 +96,7 @@ bool update_pos(struct thread ** heap,int location,int heap_size,thread_compare 
 			}while(!updated);
 		}
 	}
+	return true;
 
 }
 
@@ -109,9 +110,9 @@ struct thread * pop_top(struct thread ** heap,int heap_size,thread_compare comp)
 		return NULL;
 	}
 	struct thread *temp;
-	temp=heap[heap_size-1];
-	heap[heap_size-1]=heap[0];
-	heap[0]=temp;
+	temp=heap[0];
+	heap[0]=heap[heap_size-1];
+	heap[heap_size-1]=temp;
 	update_pos(heap,0,heap_size-1,comp);
 	return heap[heap_size-1];
 }

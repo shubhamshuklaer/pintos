@@ -11,6 +11,8 @@
 #include "threads/switch.h"
 #include "threads/synch.h"
 #include "threads/vaddr.h"
+#include "threads/thread_heap.h"
+#include "threads/malloc.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -20,9 +22,8 @@
    of thread.h for details. */
 #define THREAD_MAGIC 0xcd6abf4b
 
-/* List of processes in THREAD_READY state, that is, processes
-   that are ready to run but not actually running. */
-static struct list ready_list;
+
+
 
 /* List of all processes.  Processes are added to this list
    when they are first scheduled and removed when they exit. */
@@ -71,6 +72,17 @@ static void schedule (void);
 void schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
 
+
+
+// For scheduler
+/* heap of processes in THREAD_READY state, that is, processes
+   that are ready to run but not actually running. */
+static struct thread ** ready_heap;
+static int num_threads_ready,heap_capacity;
+static bool compare_priority(struct thread *, struct thread *);
+static bool insert_in_ready_heap(struct thread *);
+static long long ready_insertion_rank;
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -88,9 +100,7 @@ void
 thread_init (void) 
 {
   ASSERT (intr_get_level () == INTR_OFF);
-
   lock_init (&tid_lock);
-  list_init (&ready_list);
   list_init (&all_list);
 
   /* Set up a thread structure for the running thread. */
@@ -105,16 +115,20 @@ thread_init (void)
 void
 thread_start (void) 
 {
+  // for scheduling
+  ready_heap=(struct thread **)malloc(32* sizeof(struct thread *));
+  num_threads_ready=0;
+  heap_capacity=32;
+  ready_insertion_rank=0;
   /* Create the idle thread. */
   struct semaphore idle_started;
   sema_init (&idle_started, 0);
   thread_create ("idle", PRI_MIN, idle, &idle_started);
-
   /* Start preemptive thread scheduling. */
   intr_enable ();
-
   /* Wait for the idle thread to initialize idle_thread. */
   sema_down (&idle_started);
+  
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -245,7 +259,19 @@ thread_unblock (struct thread *t)
 
   old_level = intr_disable ();
   ASSERT (t->status == THREAD_BLOCKED);
-  list_push_back (&ready_list, &t->elem);
+  // for scheduler
+  // When the first time thread_start calls thread_create for idle thread after initialization
+  // of the thread this function thread_unblock is called but the variable idle_thread is still not initialized 
+  // so for the first time idle thread will go into ready queue... but its good for us actually
+  // since in next_thread_to_run we will return idle_thread if ready queue is empty but idle_thread
+  // is still not initialized till that time...!! So this actually helps us..!!
+  if(t!=idle_thread){
+    insert_in_ready_heap(t);
+    // if(thread_current()->priority<ready_heap[0]->priority){
+    //   printf("%s\n",thread_current()->name);
+    //   thread_yield();
+    // }
+  }
   t->status = THREAD_READY;
   intr_set_level (old_level);
 }
@@ -316,7 +342,7 @@ thread_yield (void)
 
   old_level = intr_disable ();
   if (cur != idle_thread) 
-    list_push_back (&ready_list, &cur->elem);
+    insert_in_ready_heap(cur);
   cur->status = THREAD_READY;
   schedule ();
   intr_set_level (old_level);
@@ -343,7 +369,9 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
-  thread_current ()->priority = new_priority;
+  struct thread *t;
+  t=thread_current ();
+  t->priority = new_priority;
 }
 
 /* Returns the current thread's priority. */
@@ -493,10 +521,17 @@ alloc_frame (struct thread *t, size_t size)
 static struct thread *
 next_thread_to_run (void) 
 {
-  if (list_empty (&ready_list))
+  
+  if (num_threads_ready==0){
     return idle_thread;
-  else
-    return list_entry (list_pop_front (&ready_list), struct thread, elem);
+  }else{
+    struct thread *t;
+    t=pop_top(ready_heap,num_threads_ready,&compare_priority);
+    num_threads_ready--;   
+    ASSERT(is_thread(t));
+    return t;
+  }
+
 }
 
 /* Completes a thread switch by activating the new thread's page
@@ -581,6 +616,49 @@ allocate_tid (void)
 
   return tid;
 }
+
+// For scheduler
+bool compare_priority(struct thread *first, struct thread *second){
+  if(first->priority>second->priority)
+    return true;
+  else if(first->priority==second->priority){
+    if(first->insertion_rank<second->insertion_rank)
+      return true;
+    else
+      return false;
+    
+  }else{
+    return false;
+  }
+}
+
+
+bool insert_in_ready_heap(struct thread *t){
+  t->insertion_rank=ready_insertion_rank;
+  ready_insertion_rank++;
+  if(heap_capacity>=num_threads_ready+1){
+    insert(ready_heap,t,num_threads_ready,&compare_priority);
+    num_threads_ready++;
+  }else{
+    ready_heap=(struct thread **)realloc(ready_heap,2*heap_capacity*sizeof(struct thread *));
+    if(ready_heap==NULL)
+      return false;
+    else{
+      heap_capacity*=2;
+      insert(ready_heap,t,num_threads_ready,&compare_priority);
+      num_threads_ready++;
+    }
+  }
+  int i;
+  printf("%s-%d\t",thread_current()->name,thread_current()->priority);
+  for(i=0;i<num_threads_ready;i++)
+    printf ("%s %d-%lld\t",ready_heap[i]->name,ready_heap[i]->priority,ready_heap[i]->insertion_rank);
+  printf("\n");
+  return true;
+}
+
+
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
