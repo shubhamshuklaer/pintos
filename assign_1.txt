@@ -1,0 +1,7 @@
+In your 1st assignment you
+have to complete implementation of two sections:
+
+1. Alarm Clock(Sec. 2.2.2)
+2. Priority Scheduling (Sec. 2.2.3)
+
+Hard deadline: 28 Aug'14.
