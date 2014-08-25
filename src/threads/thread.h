@@ -88,7 +88,8 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
-    long long insertion_rank;                /* used for mainitaining FIFO in heap for same values*/
+    int base_priority;                  /* Priority before donation */              
+    long long insertion_rank;           /* used for mainitaining FIFO in heap for same values*/
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
