@@ -93,7 +93,8 @@ struct thread
     int priority;                       /* Priority. */
     int base_priority;                  /* Priority before donation */              
     long long insertion_rank;           /* used for mainitaining FIFO in heap for same values*/
-    int64_t ticks_left;               /* For sleep list */
+    int64_t ticks_left;                 /* For sleep list */
+    struct lock *waiting_on_lock;       /* For priority donation */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
@@ -144,6 +145,9 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
+
+// priority update
+void update_ready_heap_pos(struct thread *t);
 
 
 #endif /* threads/thread.h */

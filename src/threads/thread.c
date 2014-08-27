@@ -505,7 +505,9 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->base_priority=priority;
   t->magic = THREAD_MAGIC;
+  t->waiting_on_lock = NULL;
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -670,7 +672,19 @@ bool insert_in_ready_heap(struct thread *t){
   return true;
 }
 
-
+void update_ready_heap_pos(struct thread *t){
+  int i=0;
+  bool found=false;
+  while(!found&&i<num_threads_ready){
+    if(ready_heap[i]==t)
+      found=true;
+    else
+      i++;
+  }
+  if(found){
+    update_pos(ready_heap,i,num_threads_ready,&compare_priority);
+  }
+}
 
 
 /* Offset of `stack' member within `struct thread'.
