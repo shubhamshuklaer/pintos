@@ -267,10 +267,6 @@ thread_unblock (struct thread *t)
   // is still not initialized till that time...!! So this actually helps us..!!
   if(t!=idle_thread){
     insert_in_ready_heap(t);
-    // if(thread_current()->priority<ready_heap[0]->priority){
-    //   printf("%s\n",thread_current()->name);
-    //   thread_yield();
-    // }
   }
   t->status = THREAD_READY;
   intr_set_level (old_level);
