@@ -116,9 +116,9 @@ void
 thread_start (void) 
 {
   // for scheduling
-  ready_heap=(struct thread **)malloc(32* sizeof(struct thread *));
+  ready_heap=(struct thread **)malloc(READY_HEAP_MIN_SIZE* sizeof(struct thread *));
   num_threads_ready=0;
-  heap_capacity=32;
+  heap_capacity=READY_HEAP_MIN_SIZE;
   ready_insertion_rank=0;
   /* Create the idle thread. */
   struct semaphore idle_started;
@@ -151,6 +151,13 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  // for preemption of the current thread if its priority is less than priority of read_heap[0]
+  // We will be implementing it through interrupt later but its necesary so that if interrupt are disabled at the time
+  // the new element was pushed in the ready_heap then we will miss the premption so this part will be needed even after \
+  // we handle preemption using interrupts..!!
+  if(t->priority<ready_heap[0]->priority){
+    intr_yield_on_return ();
+  }
 }
 
 /* Prints thread statistics. */
@@ -270,6 +277,8 @@ thread_unblock (struct thread *t)
   }
   t->status = THREAD_READY;
   intr_set_level (old_level);
+  if(intr_get_level()==INTR_ON)
+    thread_yield();
 }
 
 /* Returns the name of the running thread. */
@@ -374,7 +383,11 @@ thread_set_priority (int new_priority)
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->base_priority ;
+  int temp;
+  enum intr_level old_level = intr_disable ();
+  temp= thread_current ()->priority ;
+  intr_set_level (old_level);
+  return temp;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -523,7 +536,11 @@ next_thread_to_run (void)
   }else{
     struct thread *t;
     t=pop_top(ready_heap,num_threads_ready,&compare_priority);
-    num_threads_ready--;   
+    num_threads_ready--; 
+    if(heap_capacity>READY_HEAP_MIN_SIZE && heap_capacity>4*num_threads_ready){
+      ready_heap=(struct thread **)realloc(ready_heap,(heap_capacity/2)*sizeof(struct thread *));  
+    }
+    
     ASSERT(is_thread(t));
     return t;
   }

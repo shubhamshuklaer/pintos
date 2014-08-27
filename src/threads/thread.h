@@ -11,7 +11,7 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-    THREAD_DYING        /* About to be destroyed. */
+    THREAD_DYING,       /* About to be destroyed. */
     THREAD_SLEEPING     /* For sleep list */
   };
 
@@ -24,6 +24,8 @@ typedef int tid_t;
 #define PRI_MIN 9                      /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define READY_HEAP_MIN_SIZE 32
 
 /* A kernel thread or user process.
 
@@ -91,7 +93,7 @@ struct thread
     int priority;                       /* Priority. */
     int base_priority;                  /* Priority before donation */              
     long long insertion_rank;           /* used for mainitaining FIFO in heap for same values*/
-    long long ticks_left;               /* For sleep list */
+    int64_t ticks_left;               /* For sleep list */
     struct list_elem allelem;           /* List element for all threads list. */
 
     /* Shared between thread.c and synch.c. */
