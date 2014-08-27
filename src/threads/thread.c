@@ -664,11 +664,11 @@ bool insert_in_ready_heap(struct thread *t){
       num_threads_ready++;
     }
   }
-  int i;
-  printf("%s-%d\t",thread_current()->name,thread_current()->priority);
-  for(i=0;i<num_threads_ready;i++)
-    printf ("%s %d-%lld\t",ready_heap[i]->name,ready_heap[i]->priority,ready_heap[i]->insertion_rank);
-  printf("\n");
+  // int i;
+  // printf("%s-%d\t",thread_current()->name,thread_current()->priority);
+  // for(i=0;i<num_threads_ready;i++)
+  //   printf ("%s %d-%lld\t",ready_heap[i]->name,ready_heap[i]->priority,ready_heap[i]->insertion_rank);
+  // printf("\n");
   return true;
 }
 
@@ -686,6 +686,15 @@ void update_ready_heap_pos(struct thread *t){
   }
 }
 
+bool lock_list_compare (const struct list_elem *a, const struct list_elem *b, void *aux){
+  struct thread *first,*second;
+  first=list_entry(a, struct thread, elem);
+  second=list_entry(b, struct thread, elem);
+  if(first->priority>second->priority)
+    return true;
+  else
+    return false;
+}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */

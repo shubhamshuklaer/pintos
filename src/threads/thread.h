@@ -149,5 +149,6 @@ int thread_get_load_avg (void);
 // priority update
 void update_ready_heap_pos(struct thread *t);
 
+bool lock_list_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 #endif /* threads/thread.h */
