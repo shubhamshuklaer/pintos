@@ -31,6 +31,7 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/thread_heap.h"
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -47,7 +48,8 @@ sema_init (struct semaphore *sema, unsigned value)
   ASSERT (sema != NULL);
 
   sema->value = value;
-  list_init (&sema->waiters);
+  sema->num_waiters=0;
+  sema->insertion_rank=0;
 }
 
 /* Down or "P" operation on a semaphore.  Waits for SEMA's value
@@ -68,7 +70,14 @@ sema_down (struct semaphore *sema)
   old_level = intr_disable ();
   while (sema->value == 0) 
     {
-      list_insert_ordered(&sema->waiters, &thread_current ()->elem,&lock_list_compare,NULL);
+      struct thread *t;
+      t=thread_current();
+      sema->insertion_rank++;
+      t->insertion_rank=sema->insertion_rank;
+      ASSERT(is_thread(t));
+      insert(sema->waiters,t,sema->num_waiters,&compare_priority);
+      ASSERT(is_thread(sema->waiters[0]));
+      sema->num_waiters++;
       thread_block ();
     }
   sema->value--;
@@ -113,10 +122,15 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (!list_empty (&sema->waiters)) {
-    list_sort (&sema->waiters,&lock_list_compare,NULL);
-    thread_unblock (list_entry (list_pop_front (&sema->waiters),
-                                struct thread, elem));
+  if (sema->num_waiters!=0) {
+    struct thread *t;
+    ASSERT(is_thread(sema->waiters[0]));
+    heapify(sema->waiters,sema->num_waiters,&compare_priority);
+    t=pop_top( sema->waiters,sema->num_waiters,&compare_priority);
+    ASSERT(t!=NULL);
+    ASSERT(is_thread(t));
+    sema->num_waiters--;
+    thread_unblock (t);
   }
   sema->value++;
   intr_set_level (old_level);
@@ -347,7 +361,7 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (lock_held_by_current_thread (lock));
 
   if (!list_empty (&cond->waiters)) {
-    list_sort (&cond->waiters,&lock_list_compare,NULL);
+    // list_sort (&cond->waiters,&lock_list_compare,NULL);
     sema_up (&list_entry (list_pop_front (&cond->waiters),
                           struct semaphore_elem, elem)->semaphore);
   }

@@ -130,3 +130,9 @@ bool insert(struct thread ** heap,struct thread * element,int heap_size,thread_c
 }
 
 
+bool heapify(struct thread ** heap,int heap_size,thread_compare comp){
+	int i;
+	for(i=heap_size-1;i>=0;i--)
+		update_pos(heap,i,heap_size,comp);
+	return true;
+}

@@ -66,7 +66,6 @@ static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
-static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void schedule_tail (struct thread *prev);
@@ -79,7 +78,6 @@ static tid_t allocate_tid (void);
    that are ready to run but not actually running. */
 static struct thread ** ready_heap;
 static int num_threads_ready,heap_capacity;
-static bool compare_priority(struct thread *, struct thread *);
 static bool insert_in_ready_heap(struct thread *);
 static long long ready_insertion_rank;
 
@@ -485,7 +483,7 @@ running_thread (void)
 }
 
 /* Returns true if T appears to point to a valid thread. */
-static bool
+bool
 is_thread (struct thread *t)
 {
   return t != NULL && t->magic == THREAD_MAGIC;
@@ -686,15 +684,21 @@ void update_ready_heap_pos(struct thread *t){
   }
 }
 
-bool lock_list_compare (const struct list_elem *a, const struct list_elem *b, void *aux){
-  struct thread *first,*second;
-  first=list_entry(a, struct thread, elem);
-  second=list_entry(b, struct thread, elem);
-  if(first->priority>second->priority)
-    return true;
-  else
-    return false;
+void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size){
+  int i=0;
+  bool found=false;
+  while(!found&&i<heap_size){
+    if(ready_heap[i]==t)
+      found=true;
+    else
+      i++;
+  }
+  ASSERT(found);
+  if(found){
+    update_pos(heap,i,heap_size,&compare_priority);
+  }
 }
+
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
