@@ -154,4 +154,7 @@ void update_ready_heap_pos(struct thread *t);
 
  bool is_thread (struct thread *t);
  void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size);
+ void thread_yield_if_applicable(void);
+
+ void correct_priority(struct thread *t);
 #endif /* threads/thread.h */

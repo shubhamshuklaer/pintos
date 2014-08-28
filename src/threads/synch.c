@@ -122,7 +122,7 @@ sema_up (struct semaphore *sema)
   ASSERT (sema != NULL);
 
   old_level = intr_disable ();
-  if (sema->num_waiters!=0) {
+  if (sema->num_waiters>0) {
     struct thread *t;
     ASSERT(is_thread(sema->waiters[0]));
     heapify(sema->waiters,sema->num_waiters,&compare_priority);
@@ -273,10 +273,12 @@ lock_release (struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
   t=lock->holder;
-  t->priority=t->base_priority;
   t->waiting_on_lock=NULL;
   lock->holder = NULL;
+  ASSERT(t->status==THREAD_RUNNING);
+  correct_priority(t);
   sema_up (&lock->semaphore);
+  thread_yield_if_applicable();
 }
 
 /* Returns true if the current thread holds LOCK, false

@@ -275,8 +275,13 @@ thread_unblock (struct thread *t)
   }
   t->status = THREAD_READY;
   intr_set_level (old_level);
-  if(intr_get_level()==INTR_ON)
-    thread_yield();
+  
+
+  if(intr_get_level()==INTR_ON){
+    if(thread_current()->priority<ready_heap[0]->priority)
+      thread_yield();
+  }
+
 }
 
 /* Returns the name of the running thread. */
@@ -359,7 +364,6 @@ thread_foreach (thread_action_func *func, void *aux)
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
-
   for (e = list_begin (&all_list); e != list_end (&all_list);
        e = list_next (e))
     {
@@ -699,6 +703,34 @@ void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size){
   }
 }
 
+
+void thread_yield_if_applicable(void){
+  if(intr_get_level()==INTR_ON){
+    if(thread_current()->priority<ready_heap[0]->priority)
+      thread_yield();
+  }
+}
+
+
+void correct_priority(struct thread *t){
+  int max=t->base_priority;
+  ASSERT(t->status==THREAD_RUNNING);
+  struct list_elem *e;
+  enum intr_level old_level;
+  old_level = intr_disable ();
+  for (e = list_begin (&all_list); e != list_end (&all_list); e = list_next (e)){
+      struct thread *s = list_entry (e, struct thread, allelem);
+      if(s->waiting_on_lock!=NULL){
+        if(s->waiting_on_lock->holder==t){
+          ASSERT(t->status==THREAD_RUNNING);
+          if(max<s->priority)
+            max=s->priority;
+        }
+      }
+  }
+  t->priority=max;
+intr_set_level (old_level);
+}
 
 /* Offset of `stack' member within `struct thread'.
    Used by switch.S, which can't figure it out on its own. */
