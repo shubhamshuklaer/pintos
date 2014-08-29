@@ -11,8 +11,7 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-    THREAD_DYING,       /* About to be destroyed. */
-    THREAD_SLEEPING     /* For sleep list */
+    THREAD_DYING       /* About to be destroyed. */
   };
 
 /* Thread identifier type.
@@ -96,7 +95,8 @@ struct thread
     int64_t ticks_left;                 /* For sleep list */
     struct lock *waiting_on_lock;       /* For priority donation */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    struct list_elem donation_elem;     /* for adding to donation list */
+    struct list donations;               /* List containing donations */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -156,5 +156,9 @@ void update_ready_heap_pos(struct thread *t);
  void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size);
  void thread_yield_if_applicable(void);
 
- void correct_priority(struct thread *t);
+ void update_priority(struct thread *t);
+ void remove_donation_for_lock(struct thread *t, struct lock * lock);
+ bool elem_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+ bool donation_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+ void insert_into_sleep_list(int64_t ticks);
 #endif /* threads/thread.h */

@@ -8,9 +8,7 @@
 struct semaphore 
   {
     unsigned value;             /* Current value. */
-    struct thread * waiters[32];        /* List of waiting threads. */
-    int num_waiters;
-    int insertion_rank;
+    struct list waiters;        /* List of waiting threads. */
   };
 
 void sema_init (struct semaphore *, unsigned value);
