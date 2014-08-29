@@ -734,12 +734,12 @@ void thread_yield_if_applicable(void){
 void update_priority(struct thread *t){
   int max=t->base_priority;
   struct thread *s;
-    if(!list_empty(&(t->donations))){
-      s=list_entry(list_front(&(t->donations)),struct thread,donation_elem);
-      if(s->priority>max)
-        max=s->priority;
-    }
-    t->priority=max;
+  if(!list_empty(&(t->donations))){
+    s=list_entry(list_front(&(t->donations)),struct thread,donation_elem);
+    if(s->priority>max)
+      max=s->priority;
+  }
+  t->priority=max;
   if(t->status==THREAD_RUNNING){
     thread_yield_if_applicable();
   }else if(t->status==THREAD_READY){
