@@ -682,11 +682,6 @@ bool insert_in_ready_heap(struct thread *t){
       num_threads_ready++;
     }
   }
-  // int i;
-  // printf("%s-%d\t",thread_current()->name,thread_current()->priority);
-  // for(i=0;i<num_threads_ready;i++)
-  //   printf ("%s %d-%lld\t",ready_heap[i]->name,ready_heap[i]->priority,ready_heap[i]->insertion_rank);
-  // printf("\n");
   return true;
 }
 

@@ -247,12 +247,14 @@ lock_release (struct lock *lock)
   struct thread *t;
   ASSERT (lock != NULL);
   ASSERT (lock_held_by_current_thread (lock));
+  enum intr_level old_level = intr_disable();
   t=lock->holder;
   t->waiting_on_lock=NULL;
   lock->holder = NULL;
   remove_donation_for_lock(t,lock);
   update_priority(t);
   sema_up (&lock->semaphore);
+  intr_set_level (old_level);
   thread_yield_if_applicable();
 }
 
