@@ -29,6 +29,11 @@
    when they are first scheduled and removed when they exit. */
 static struct list all_list;
 
+
+/* Sleep list */
+static struct list sleep_list;
+
+
 /* Idle thread. */
 static struct thread *idle_thread;
 
@@ -66,7 +71,6 @@ static void idle (void *aux UNUSED);
 static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
-static bool is_thread (struct thread *) UNUSED;
 static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void schedule_tail (struct thread *prev);
@@ -79,7 +83,6 @@ static tid_t allocate_tid (void);
    that are ready to run but not actually running. */
 static struct thread ** ready_heap;
 static int num_threads_ready,heap_capacity;
-static bool compare_priority(struct thread *, struct thread *);
 static bool insert_in_ready_heap(struct thread *);
 static long long ready_insertion_rank;
 
@@ -102,7 +105,7 @@ thread_init (void)
   ASSERT (intr_get_level () == INTR_OFF);
   lock_init (&tid_lock);
   list_init (&all_list);
-
+  list_init (&sleep_list);
   /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
@@ -116,9 +119,9 @@ void
 thread_start (void) 
 {
   // for scheduling
-  ready_heap=(struct thread **)malloc(32* sizeof(struct thread *));
+  ready_heap=(struct thread **)malloc(READY_HEAP_MIN_SIZE* sizeof(struct thread *));
   num_threads_ready=0;
-  heap_capacity=32;
+  heap_capacity=READY_HEAP_MIN_SIZE;
   ready_insertion_rank=0;
   /* Create the idle thread. */
   struct semaphore idle_started;
@@ -137,7 +140,7 @@ void
 thread_tick (void) 
 {
   struct thread *t = thread_current ();
-
+  struct list_elem *e;
   /* Update statistics. */
   if (t == idle_thread)
     idle_ticks++;
@@ -148,9 +151,25 @@ thread_tick (void)
   else
     kernel_ticks++;
 
+  // sleep list
+  for (e = list_begin (&sleep_list); e != list_end (&sleep_list);e = list_next (e)){
+    struct thread *s = list_entry (e, struct thread, elem);
+    s->ticks_left--;
+  }
+  while(!list_empty(&sleep_list)&&list_entry(list_front(&sleep_list),struct thread,elem)->ticks_left==0){
+    thread_unblock(list_entry(list_pop_front(&sleep_list),struct thread, elem));
+  }
+
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+  // for preemption of the current thread if its priority is less than priority of read_heap[0]
+  // We will be implementing it through interrupt later but its necesary so that if interrupt are disabled at the time
+  // the new element was pushed in the ready_heap then we will miss the premption so this part will be needed even after \
+  // we handle preemption using interrupts..!!
+  if(t->priority<ready_heap[0]->priority){
+    intr_yield_on_return ();
+  }
 }
 
 /* Prints thread statistics. */
@@ -270,6 +289,13 @@ thread_unblock (struct thread *t)
   }
   t->status = THREAD_READY;
   intr_set_level (old_level);
+  
+
+  if(intr_get_level()==INTR_ON){
+    if(thread_current()->priority<ready_heap[0]->priority)
+      thread_yield();
+  }
+
 }
 
 /* Returns the name of the running thread. */
@@ -352,7 +378,6 @@ thread_foreach (thread_action_func *func, void *aux)
   struct list_elem *e;
 
   ASSERT (intr_get_level () == INTR_OFF);
-
   for (e = list_begin (&all_list); e != list_end (&all_list);
        e = list_next (e))
     {
@@ -368,13 +393,18 @@ thread_set_priority (int new_priority)
   struct thread *t;
   t=thread_current ();
   t->base_priority = new_priority;
+  update_priority(t);
 }
 
 /* Returns the current thread's priority. */
 int
 thread_get_priority (void) 
 {
-  return thread_current ()->base_priority ;
+  int temp;
+  enum intr_level old_level = intr_disable ();
+  temp= thread_current ()->priority ;
+  intr_set_level (old_level);
+  return temp;
 }
 
 /* Sets the current thread's nice value to NICE. */
@@ -472,7 +502,7 @@ running_thread (void)
 }
 
 /* Returns true if T appears to point to a valid thread. */
-static bool
+bool
 is_thread (struct thread *t)
 {
   return t != NULL && t->magic == THREAD_MAGIC;
@@ -492,7 +522,10 @@ init_thread (struct thread *t, const char *name, int priority)
   strlcpy (t->name, name, sizeof t->name);
   t->stack = (uint8_t *) t + PGSIZE;
   t->priority = priority;
+  t->base_priority=priority;
   t->magic = THREAD_MAGIC;
+  t->waiting_on_lock = NULL;
+  list_init(&(t->donations));
   list_push_back (&all_list, &t->allelem);
 }
 
@@ -523,7 +556,11 @@ next_thread_to_run (void)
   }else{
     struct thread *t;
     t=pop_top(ready_heap,num_threads_ready,&compare_priority);
-    num_threads_ready--;   
+    num_threads_ready--; 
+    if(heap_capacity>READY_HEAP_MIN_SIZE && heap_capacity>4*num_threads_ready){
+      ready_heap=(struct thread **)realloc(ready_heap,(heap_capacity/2)*sizeof(struct thread *));  
+    }
+    
     ASSERT(is_thread(t));
     return t;
   }
@@ -645,15 +682,142 @@ bool insert_in_ready_heap(struct thread *t){
       num_threads_ready++;
     }
   }
-  int i;
-  printf("%s-%d\t",thread_current()->name,thread_current()->priority);
-  for(i=0;i<num_threads_ready;i++)
-    printf ("%s %d-%lld\t",ready_heap[i]->name,ready_heap[i]->priority,ready_heap[i]->insertion_rank);
-  printf("\n");
   return true;
 }
 
+void update_ready_heap_pos(struct thread *t){
+  int i=0;
+  bool found=false;
+  while(!found&&i<num_threads_ready){
+    if(ready_heap[i]==t)
+      found=true;
+    else
+      i++;
+  }
+  if(found){
+    update_pos(ready_heap,i,num_threads_ready,&compare_priority);
+  }
+}
 
+void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size){
+  int i=0;
+  bool found=false;
+  while(!found&&i<heap_size){
+    if(ready_heap[i]==t)
+      found=true;
+    else
+      i++;
+  }
+  ASSERT(found);
+  if(found){
+    update_pos(heap,i,heap_size,&compare_priority);
+  }
+}
+
+
+void thread_yield_if_applicable(void){
+  if(intr_get_level()==INTR_ON){
+    if(thread_current()->priority<ready_heap[0]->priority)
+      thread_yield();
+  }
+}
+
+
+
+
+
+void update_priority(struct thread *t){
+  int max=t->base_priority;
+  struct thread *s;
+  if(!list_empty(&(t->donations))){
+    s=list_entry(list_front(&(t->donations)),struct thread,donation_elem);
+    if(s->priority>max)
+      max=s->priority;
+  }
+  t->priority=max;
+  if(t->status==THREAD_RUNNING){
+    thread_yield_if_applicable();
+  }else if(t->status==THREAD_READY){
+    update_pos_in_heap(ready_heap,t,num_threads_ready);
+  }else if(t->status==THREAD_BLOCKED){
+    while(t->waiting_on_lock!=NULL){
+      ASSERT(t->waiting_on_lock->holder!=NULL)
+      t=t->waiting_on_lock->holder;
+      update_priority(t);
+    }
+  }
+
+}
+
+void remove_donation_for_lock(struct thread *t,struct lock * lock){
+  struct list_elem *e,*next,*end;
+  struct thread *s;
+  e=list_begin(&(t->donations));// is is actually &(list->head.next);
+  end=list_end(&(t->donations));//it is actually &(list->tail)
+  while(e!=end){
+    s=list_entry(e,struct thread,donation_elem);
+    next=list_next(e);
+    if(s->waiting_on_lock==lock){
+      list_remove(e);
+    }
+    e=next;
+  }
+}
+
+
+bool donation_list_compare(struct list_elem *first,struct list_elem *second, void *unused){
+  struct thread *first_thread,*second_thread;
+  first_thread=list_entry(first,struct thread,donation_elem);
+  second_thread=list_entry(second,struct thread,donation_elem);
+  if(first_thread->priority>second_thread->priority)
+    return true;
+  else
+    return false;
+
+}
+
+
+bool elem_list_compare(struct list_elem *first,struct list_elem *second, void *unused){
+  struct thread *first_thread,*second_thread;
+  first_thread=list_entry(first,struct thread,elem);
+  second_thread=list_entry(second,struct thread,elem);
+  if(first_thread->priority > second_thread->priority)
+    return true;
+  else
+    return false;
+
+}
+
+
+
+static bool sleep_list_compare(struct list_elem *first,struct list_elem *second, void *unused){
+  struct thread *first_thread,*second_thread;
+  first_thread=list_entry(first,struct thread,elem);
+  second_thread=list_entry(second,struct thread,elem);
+  if(first_thread->ticks_left < second_thread->ticks_left){
+    return true;
+  }else if(first_thread->ticks_left == second_thread->ticks_left){
+    if(first_thread->priority > second_thread->priority)
+      return true;
+    else
+      return false;
+  }else{
+    return false;
+  }
+
+} 
+
+
+void insert_into_sleep_list(int64_t ticks){
+  struct thread *t;
+  enum intr_level old_level;
+  t=thread_current();
+  t->ticks_left=ticks;
+  list_insert_ordered(&sleep_list,&(t->elem),&sleep_list_compare,NULL);
+  old_level = intr_disable ();
+  thread_block();
+  intr_set_level(old_level);
+}
 
 
 /* Offset of `stack' member within `struct thread'.

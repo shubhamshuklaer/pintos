@@ -18,6 +18,8 @@ typedef bool (*thread_compare)(struct thread *,struct thread *);
 struct thread * pop_top(struct thread ** heap,int heap_size,thread_compare comp);
 bool insert(struct thread ** heap,struct thread * element,int heap_size,thread_compare comp);
 bool update_pos(struct thread ** heap,int location,int heap_size,thread_compare comp);
+bool build_heap(struct thread ** heap,int heap_size,thread_compare comp);
+bool heapify(struct thread ** heap,int location,int heap_size,thread_compare comp);
 
 
 #endif /* threads/heap.h */

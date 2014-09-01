@@ -11,8 +11,7 @@ enum thread_status
     THREAD_RUNNING,     /* Running thread. */
     THREAD_READY,       /* Not running but ready to run. */
     THREAD_BLOCKED,     /* Waiting for an event to trigger. */
-    THREAD_DYING        /* About to be destroyed. */
-    THREAD_SLEEPING     /* For sleep list */
+    THREAD_DYING       /* About to be destroyed. */
   };
 
 /* Thread identifier type.
@@ -21,9 +20,11 @@ typedef int tid_t;
 #define TID_ERROR ((tid_t) -1)          /* Error value for tid_t. */
 
 /* Thread priorities. */
-#define PRI_MIN 9                      /* Lowest priority. */
+#define PRI_MIN 0                      /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define READY_HEAP_MIN_SIZE 32
 
 /* A kernel thread or user process.
 
@@ -91,9 +92,11 @@ struct thread
     int priority;                       /* Priority. */
     int base_priority;                  /* Priority before donation */              
     long long insertion_rank;           /* used for mainitaining FIFO in heap for same values*/
-    long long ticks_left;               /* For sleep list */
+    int64_t ticks_left;                 /* For sleep list */
+    struct lock *waiting_on_lock;       /* For priority donation */
     struct list_elem allelem;           /* List element for all threads list. */
-
+    struct list_elem donation_elem;     /* for adding to donation list */
+    struct list donations;               /* List containing donations */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -143,5 +146,19 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 
+// priority update
+void update_ready_heap_pos(struct thread *t);
 
+
+ bool compare_priority(struct thread *, struct thread *);
+
+ bool is_thread (struct thread *t);
+ void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size);
+ void thread_yield_if_applicable(void);
+
+ void update_priority(struct thread *t);
+ void remove_donation_for_lock(struct thread *t, struct lock * lock);
+ bool elem_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+ bool donation_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+ void insert_into_sleep_list(int64_t ticks);
 #endif /* threads/thread.h */
