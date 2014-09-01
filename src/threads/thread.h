@@ -24,7 +24,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define READY_HEAP_MIN_SIZE 32
+#define READY_HEAP_MIN_SIZE 32          /* The minimum size of scheduler's ready heap */
 
 /* A kernel thread or user process.
 
@@ -96,7 +96,7 @@ struct thread
     struct lock *waiting_on_lock;       /* For priority donation */
     struct list_elem allelem;           /* List element for all threads list. */
     struct list_elem donation_elem;     /* for adding to donation list */
-    struct list donations;               /* List containing donations */
+    struct list donations;              /* List containing priority doners */
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
@@ -146,19 +146,40 @@ int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
 
-// priority update
+// For updating the position of a thread in ready heap in case the 
+// properties of thread(priority) change while the thread is in ready heap
 void update_ready_heap_pos(struct thread *t);
 
+// If this function returns true the first thread goes up in the ready_heap
+bool compare_priority(struct thread *first, struct thread *second);
 
- bool compare_priority(struct thread *, struct thread *);
+// The function was made non static to make it available for debugging in other places
+bool is_thread (struct thread *t);
 
- bool is_thread (struct thread *t);
- void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size);
- void thread_yield_if_applicable(void);
+// Just a generalized version of update_ready_heap_pos just we can pass the heap pointer too
+void update_pos_in_heap(struct thread **heap,struct thread *t,int heap_size);
 
- void update_priority(struct thread *t);
- void remove_donation_for_lock(struct thread *t, struct lock * lock);
- bool elem_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
- bool donation_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
- void insert_into_sleep_list(int64_t ticks);
+// Yield the thread if interrupts are off and the priority of thread is lesser than that of a 
+// ready_thread
+void thread_yield_if_applicable(void);
+
+// Updates the priority of the thread based on the priority donations and the state of the thread
+// eg. for running thread it yields the thread if applicable after updating priority
+// for ready thread call update_ready_heap_pos
+// for blocked thread updates the priority of all the threads for which it provides donations as well
+// as all the threads which are affected by the updation of priority of all these threads by recursivley 
+// calling itself for different threads
+void update_priority(struct thread *t);
+
+// Remove the priority donations from a thread for a particular lock
+void remove_donation_for_lock(struct thread *t, struct lock * lock);
+
+// The compare function used in list sorting where the list_elem is elem
+bool elem_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+// The compare function used in list sorting where the list_elem is donation_elem... 
+// i.e its used for sorting the donations list..!!
+bool donation_list_compare(struct list_elem *first,struct list_elem *second, void *unused);
+
+// Insert the current thread into sleep list
+void insert_into_sleep_list(int64_t ticks);
 #endif /* threads/thread.h */

@@ -102,7 +102,7 @@ timer_sleep (int64_t ticks)
 
   ASSERT (intr_get_level () == INTR_ON);
   if (timer_elapsed (start) < ticks){
-    insert_into_sleep_list(ticks);
+    insert_into_sleep_list(ticks); // For non busy wait..!! Insert the current thread into sleep list
   }
 }
 

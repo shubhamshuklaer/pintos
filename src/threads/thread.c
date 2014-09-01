@@ -82,8 +82,15 @@ static tid_t allocate_tid (void);
 /* heap of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct thread ** ready_heap;
+// num_threads_ready is num of threads in the ready heap
+// heap capacity is the total size of ready heap array
 static int num_threads_ready,heap_capacity;
+
+// Insert a thread into ready heap
 static bool insert_in_ready_heap(struct thread *);
+
+// this is for ensuring that the sort provided by heap is stable sort by
+// ensuring that no two threads have same priority(Actual priority and read heap insertion rank)
 static long long ready_insertion_rank;
 
 /* Initializes the threading system by transforming the code

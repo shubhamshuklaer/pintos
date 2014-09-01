@@ -1,9 +1,5 @@
 #include "thread_heap.h"
 
-/*
-compare function should return true if first argument needs to moves up in the heap..!!
-*/
-
 
 static void thread_swap(struct thread **heap,int i,int j){
 	struct thread *temp;
