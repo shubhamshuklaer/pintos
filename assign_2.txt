@@ -1,0 +1,7 @@
+In your 2nd assignment of Pintos you have to complete implementation of
+three sections of Project 2 (User Programs):
+1. Process Termination Messages (Sec. 3.3.2)
+2. Argument Passing (Sec. 3.3.3)
+3. System Calls (Sec. 3.3.4)
+
+Hard deadline: 30 September 2014 (before 3pm)
