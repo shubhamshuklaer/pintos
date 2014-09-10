@@ -85,6 +85,8 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
     return NULL;
 
   lock_acquire (&pool->lock);
+
+  // find in used pool first continuous 'page_cnt' nos. of not-used pages
   page_idx = bitmap_scan_and_flip (pool->used_map, 0, page_cnt, false);
   lock_release (&pool->lock);
 
@@ -93,6 +95,7 @@ palloc_get_multiple (enum palloc_flags flags, size_t page_cnt)
   else
     pages = NULL;
 
+  // initialize page with zeros
   if (pages != NULL) 
     {
       if (flags & PAL_ZERO)
