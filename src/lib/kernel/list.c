@@ -71,7 +71,9 @@ list_init (struct list *list)
 struct list_elem *
 list_begin (struct list *list)
 {
+  
   ASSERT (list != NULL);
+
   return list->head.next;
 }
 

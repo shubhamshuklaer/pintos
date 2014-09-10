@@ -1,0 +1,26 @@
+--------------------
+#0  list_begin (list=list@entry=0xc011b048) at ../../lib/kernel/list.c:73
+--------------------
+#1  0xc0101650 in remove_donation_for_lock (t=t@entry=0xc011b000, 
+    lock=lock@entry=0xc0115198 <console_lock>) at ../../threads/thread.c:764
+--------------------
+#2  0xc0102f84 in lock_release (lock=lock@entry=0xc0115198 <console_lock>)
+    at ../../threads/synch.c:258
+--------------------
+#3  0xc0109e7e in release_console () at ../../lib/kernel/console.c:108
+--------------------
+#4  0xc0109f03 in vprintf (
+    format=format@entry=0xc010f498 "Page fault at %p: %s error %s page in %s context.\n", args=args@entry=0xc011be8c "\b") at ../../lib/kernel/console.c:132
+--------------------
+#5  0xc0106375 in printf (
+    format=format@entry=0xc010f498 "Page fault at %p: %s error %s page in %s context.\n") at ../../lib/stdio.c:85
+--------------------
+#6  0xc010b045 in page_fault (f=0xc011beec) at ../../userprog/exception.c:154
+--------------------
+#7  0xc0101ced in intr_handler (frame=0xc011beec) at ../../threads/interrupt.c:362
+--------------------
+#8  0xc0101e24 in intr_entry () at ../../threads/intr-stubs.S:37
+--------------------
+#9  0xc011beec in ?? ()
+--------------------
+#10 0xc0108278 in list_begin (list=0x0) at ../../lib/kernel/list.c:74

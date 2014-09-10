@@ -31,7 +31,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmdline) 
 {
-  printf("%s\n", "hjgjk");
+  printf("%s\n", "execute process");
   char *fn_copy;
   tid_t tid;
   
@@ -214,6 +214,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *cmdline, void (**eip) (void), void **esp) 
 {
+  printf("%s\n", "load entered");
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -230,6 +231,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   /* Open executable file. */
   char *file_name, *save_ptr;
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
+  printf("%s\nname of file : \n%s\n", file_name, file_name);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -438,6 +440,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, const char *cmdline) 
 {
+  printf("%s\n", "setup stack");
+  ASSERT(sizeof(cmdline)>0);
+  ASSERT(sizeof(cmdline)<0);
+  
   uint8_t *kpage;
   bool success = false;
 
