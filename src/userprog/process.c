@@ -69,8 +69,11 @@ start_process (void *cmdline_)
 
   /* If load failed, quit. */
   palloc_free_page (cmdline);
-  if (!success) 
+  if (!success){
+    printf("%s\n", "not successful");
     thread_exit ();
+    printf("%s\n", "not at all successful");
+  }
 
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
@@ -252,65 +255,76 @@ load (const char *cmdline, void (**eip) (void), void **esp)
       goto done; 
     }
 
+  printf("%s\n", "reading program headers");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
-    {
-      struct Elf32_Phdr phdr;
+  {
+    printf("%d\n", i);
+    struct Elf32_Phdr phdr;
 
-      if (file_ofs < 0 || file_ofs > file_length (file))
-        goto done;
-      file_seek (file, file_ofs);
+    if (file_ofs < 0 || file_ofs > file_length (file))
+      goto done;
+    printf("%s\n", "seeking file");
+    file_seek (file, file_ofs);
 
-      if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+    printf("%s\n", "reading file");
+    if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
+      goto done;
+    file_ofs += sizeof phdr;
+    printf("%s\n", "reading type");
+    switch (phdr.p_type) 
+      {
+      case PT_NULL:
+      case PT_NOTE:
+      case PT_PHDR:
+      case PT_STACK:
+      
+      case PT_DYNAMIC:
+      case PT_INTERP:
+      case PT_SHLIB:
         goto done;
-      file_ofs += sizeof phdr;
-      switch (phdr.p_type) 
-        {
-        case PT_NULL:
-        case PT_NOTE:
-        case PT_PHDR:
-        case PT_STACK:
-        default:
-          /* Ignore this segment. */
-          break;
-        case PT_DYNAMIC:
-        case PT_INTERP:
-        case PT_SHLIB:
+      case PT_LOAD:
+        if (validate_segment (&phdr, file)) 
+          {
+            printf("%s\n", "segment validated");
+            bool writable = (phdr.p_flags & PF_W) != 0;
+            uint32_t file_page = phdr.p_offset & ~PGMASK;
+            uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
+            uint32_t page_offset = phdr.p_vaddr & PGMASK;
+            uint32_t read_bytes, zero_bytes;
+            if (phdr.p_filesz > 0)
+              {
+                /* Normal segment.
+                   Read initial part from disk and zero the rest. */
+                read_bytes = page_offset + phdr.p_filesz;
+                zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
+                              - read_bytes);
+              }
+            else 
+              {
+                printf("%s\n", "Entirely zero");
+                /* Entirely zero.
+                   Don't read anything from disk. */
+                read_bytes = 0;
+                zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
+              }
+            if (!load_segment (file, file_page, (void *) mem_page,
+                               read_bytes, zero_bytes, writable))
+              goto done;
+          }
+        else{
+          printf("%s\n", "segment not validated");
           goto done;
-        case PT_LOAD:
-          if (validate_segment (&phdr, file)) 
-            {
-              bool writable = (phdr.p_flags & PF_W) != 0;
-              uint32_t file_page = phdr.p_offset & ~PGMASK;
-              uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
-              uint32_t page_offset = phdr.p_vaddr & PGMASK;
-              uint32_t read_bytes, zero_bytes;
-              if (phdr.p_filesz > 0)
-                {
-                  /* Normal segment.
-                     Read initial part from disk and zero the rest. */
-                  read_bytes = page_offset + phdr.p_filesz;
-                  zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-                                - read_bytes);
-                }
-              else 
-                {
-                  /* Entirely zero.
-                     Don't read anything from disk. */
-                  read_bytes = 0;
-                  zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-                }
-              if (!load_segment (file, file_page, (void *) mem_page,
-                                 read_bytes, zero_bytes, writable))
-                goto done;
-            }
-          else
-            goto done;
-          break;
         }
-    }
+        break;
+      default:
+        /* Ignore this segment. */
+        break;
+      }
+  }
 
+  printf("%s\n", "setting up stack");
   /* Set up stack. */
   if (!setup_stack (esp, cmdline))
     goto done;
@@ -321,8 +335,10 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   success = true;
 
  done:
+  printf("%s\n", "done");
   /* We arrive here whether the load is successful or not. */
   file_close (file);
+  printf("%s\n", "return success");
   return success;
 }
 
@@ -335,42 +351,52 @@ static bool install_page (void *upage, void *kpage, bool writable);
 static bool
 validate_segment (const struct Elf32_Phdr *phdr, struct file *file) 
 {
+  printf("%s\n", "1");
   /* p_offset and p_vaddr must have the same page offset. */
   if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK)) 
     return false; 
 
+  printf("%s\n", "2");
   /* p_offset must point within FILE. */
   if (phdr->p_offset > (Elf32_Off) file_length (file)) 
     return false;
 
+  printf("%s\n", "3");
   /* p_memsz must be at least as big as p_filesz. */
   if (phdr->p_memsz < phdr->p_filesz) 
     return false; 
 
+  printf("%s\n", "4");
   /* The segment must not be empty. */
   if (phdr->p_memsz == 0)
     return false;
   
+  printf("%s\n", "5");
   /* The virtual memory region must both start and end within the
      user address space range. */
   if (!is_user_vaddr ((void *) phdr->p_vaddr))
     return false;
+
+  printf("%s\n", "6");
   if (!is_user_vaddr ((void *) (phdr->p_vaddr + phdr->p_memsz)))
     return false;
 
+  printf("%s\n", "7");
   /* The region cannot "wrap around" across the kernel virtual
      address space. */
   if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
     return false;
 
+  printf("\n%s\n%ld : %ld\n", "8 : ", phdr->p_vaddr, PGSIZE);
   /* Disallow mapping page 0.
      Not only is it a bad idea to map page 0, but if we allowed
      it then user code that passed a null pointer to system calls
      could quite likely panic the kernel by way of null pointer
      assertions in memcpy(), etc. */
-  if (phdr->p_vaddr < PGSIZE)
-    return false;
+  if (phdr->p_vaddr < PGSIZE);
+    // return false;
 
+  printf("%s\n", "9");
   /* It's okay. */
   return true;
 }
@@ -397,9 +423,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
+  printf("%s\n", "seeking file");
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
+      printf("%s\n", "infi");
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */

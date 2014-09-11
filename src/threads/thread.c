@@ -344,20 +344,23 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
+  printf("%s\n", "thread exit");
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   process_exit ();
 #endif
-
+  printf("%s\n", "process exit");
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it call schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
+  printf("%s\n", "ok");
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
+  printf("%s\n", "exit thread");
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
