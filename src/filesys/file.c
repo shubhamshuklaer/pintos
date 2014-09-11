@@ -17,11 +17,11 @@ struct file
 struct file *
 file_open (struct inode *inode) 
 {
-  printf("%s\n", "opening file");
+  // printf("%s\n", "opening file");
   struct file *file = calloc (1, sizeof *file);
   if (inode != NULL && file != NULL)
     {
-      printf("%s\n", "returning file");
+      // printf("%s\n", "returning file");
       file->inode = inode;
       file->pos = 0;
       file->deny_write = false;
@@ -29,7 +29,7 @@ file_open (struct inode *inode)
     }
   else
     {
-      printf("%s\n", "returning null");
+      // printf("%s\n", "returning null");
       inode_close (inode);
       free (file);
       return NULL; 

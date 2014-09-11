@@ -31,7 +31,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmdline) 
 {
-  printf("%s\n", "execute process");
+  // printf("%s\n", "execute process");
   char *fn_copy;
   tid_t tid;
   
@@ -42,11 +42,15 @@ process_execute (const char *cmdline)
     return TID_ERROR;
   strlcpy (fn_copy, cmdline, PGSIZE);
 
-  
+  // printf("%s\n", "execute thread"); 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (cmdline, PRI_DEFAULT, start_process, fn_copy);
+  tid = thread_create (cmdline, PRI_DEFAULT+1, start_process, fn_copy);
+  
+  // printf("%s\n", "created thread"); 
   if (tid == TID_ERROR)
-    palloc_free_page (fn_copy); 
+    palloc_free_page (fn_copy);  
+  // start_process(fn_copy);
+  // printf("%s\n", "exiting process");
   return tid;
 }
 
@@ -55,8 +59,9 @@ process_execute (const char *cmdline)
 static void
 start_process (void *cmdline_)
 {
-
+  // ASSERT(1==0); 
   char *cmdline = cmdline_;
+  // printf("\nstarting process : %s", (char *)cmdline);
   struct intr_frame if_;
   bool success;
 
@@ -67,12 +72,15 @@ start_process (void *cmdline_)
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmdline, &if_.eip, &if_.esp);
 
+
   /* If load failed, quit. */
   palloc_free_page (cmdline);
   if (!success){
-    printf("%s\n", "not successful");
+    // printf("%s\n", "not successful");
     thread_exit ();
-    printf("%s\n", "not at all successful");
+    // printf("%s\n", "not at all successful");
+  }else{
+    // printf("%s\n", "successful");
   }
 
   /* Start the user process by simulating a return from an
@@ -217,7 +225,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *cmdline, void (**eip) (void), void **esp) 
 {
-  printf("%s\n", "load entered");
+  // printf("\nload entered : %s\n", cmdline);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -233,8 +241,10 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
   /* Open executable file. */
   char *file_name, *save_ptr;
+  char *cmdline_copy = malloc(strlen(cmdline)+1);
+  strlcpy(cmdline_copy, cmdline, strlen(cmdline)+1);
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
-  printf("%s\nname of file : \n%s\n", file_name, file_name);
+  // printf("%s\nname of file : \n%s\n", file_name, file_name);
   file = filesys_open (file_name);
   if (file == NULL) 
     {
@@ -255,78 +265,82 @@ load (const char *cmdline, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  printf("%s\n", "reading program headers");
+  // printf("%s\n", "reading program headers");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
   {
-    printf("%d\n", i);
+    // printf("%d\n", i);
     struct Elf32_Phdr phdr;
 
     if (file_ofs < 0 || file_ofs > file_length (file))
       goto done;
-    printf("%s\n", "seeking file");
+    // printf("%s\n", "seeking file");
     file_seek (file, file_ofs);
 
-    printf("%s\n", "reading file");
+    // printf("%s\n", "reading file");
     if (file_read (file, &phdr, sizeof phdr) != sizeof phdr)
       goto done;
     file_ofs += sizeof phdr;
-    printf("%s\n", "reading type");
+    // printf("%s\n", "reading type");
     switch (phdr.p_type) 
       {
       case PT_NULL:
       case PT_NOTE:
       case PT_PHDR:
       case PT_STACK:
-      
+      default:
+        /* Ignore this segment. */
+        break;
       case PT_DYNAMIC:
       case PT_INTERP:
       case PT_SHLIB:
         goto done;
       case PT_LOAD:
         if (validate_segment (&phdr, file)) 
-          {
-            printf("%s\n", "segment validated");
-            bool writable = (phdr.p_flags & PF_W) != 0;
-            uint32_t file_page = phdr.p_offset & ~PGMASK;
-            uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
-            uint32_t page_offset = phdr.p_vaddr & PGMASK;
-            uint32_t read_bytes, zero_bytes;
-            if (phdr.p_filesz > 0)
-              {
-                /* Normal segment.
-                   Read initial part from disk and zero the rest. */
-                read_bytes = page_offset + phdr.p_filesz;
-                zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
-                              - read_bytes);
-              }
-            else 
-              {
-                printf("%s\n", "Entirely zero");
-                /* Entirely zero.
-                   Don't read anything from disk. */
-                read_bytes = 0;
-                zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
-              }
-            if (!load_segment (file, file_page, (void *) mem_page,
-                               read_bytes, zero_bytes, writable))
-              goto done;
+        {
+          // printf("%s\n", "segment validated");
+          bool writable = (phdr.p_flags & PF_W) != 0;
+          uint32_t file_page = phdr.p_offset & ~PGMASK;
+          uint32_t mem_page = phdr.p_vaddr & ~PGMASK;
+          uint32_t page_offset = phdr.p_vaddr & PGMASK;
+          uint32_t read_bytes, zero_bytes;
+          if (phdr.p_filesz > 0)
+            {
+              /* Normal segment.
+                 Read initial part from disk and zero the rest. */
+              read_bytes = page_offset + phdr.p_filesz;
+              zero_bytes = (ROUND_UP (page_offset + phdr.p_memsz, PGSIZE)
+                            - read_bytes);
+            }
+          else 
+            {
+              // printf("%s\n", "Entirely zero");
+              /* Entirely zero.
+                 Don't read anything from disk. */
+              read_bytes = 0;
+              zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
+            }
+          if (!load_segment (file, file_page, (void *) mem_page,
+                             read_bytes, zero_bytes, writable)){
+            // printf("%s\n", "failed loading segment");
+            goto done;
+          }else{
+            // printf("%s\n", "passed loading segment");
           }
+        }
         else{
-          printf("%s\n", "segment not validated");
+          // printf("%s\n", "segment not validated");
           goto done;
         }
         break;
-      default:
-        /* Ignore this segment. */
-        break;
+      
       }
   }
 
-  printf("%s\n", "setting up stack");
+  // printf("\nsetting up stack : %s\n", cmdline_copy);
   /* Set up stack. */
-  if (!setup_stack (esp, cmdline))
+  if (!setup_stack (esp, cmdline_copy))
     goto done;
 
   /* Start address. */
@@ -335,10 +349,10 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   success = true;
 
  done:
-  printf("%s\n", "done");
+  // printf("%s\n", "done");
   /* We arrive here whether the load is successful or not. */
   file_close (file);
-  printf("%s\n", "return success");
+  // printf("%s\n", "return success");
   return success;
 }
 
@@ -351,43 +365,43 @@ static bool install_page (void *upage, void *kpage, bool writable);
 static bool
 validate_segment (const struct Elf32_Phdr *phdr, struct file *file) 
 {
-  printf("%s\n", "1");
+  // printf("%s\n", "1");
   /* p_offset and p_vaddr must have the same page offset. */
   if ((phdr->p_offset & PGMASK) != (phdr->p_vaddr & PGMASK)) 
     return false; 
 
-  printf("%s\n", "2");
+  // printf("%s\n", "2");
   /* p_offset must point within FILE. */
   if (phdr->p_offset > (Elf32_Off) file_length (file)) 
     return false;
 
-  printf("%s\n", "3");
+  // printf("%s\n", "3");
   /* p_memsz must be at least as big as p_filesz. */
   if (phdr->p_memsz < phdr->p_filesz) 
     return false; 
 
-  printf("%s\n", "4");
+  // printf("%s\n", "4");
   /* The segment must not be empty. */
   if (phdr->p_memsz == 0)
     return false;
   
-  printf("%s\n", "5");
+  // printf("%s\n", "5");
   /* The virtual memory region must both start and end within the
      user address space range. */
   if (!is_user_vaddr ((void *) phdr->p_vaddr))
     return false;
 
-  printf("%s\n", "6");
+  // printf("%s\n", "6");
   if (!is_user_vaddr ((void *) (phdr->p_vaddr + phdr->p_memsz)))
     return false;
 
-  printf("%s\n", "7");
+  // printf("%s\n", "7");
   /* The region cannot "wrap around" across the kernel virtual
      address space. */
   if (phdr->p_vaddr + phdr->p_memsz < phdr->p_vaddr)
     return false;
 
-  printf("\n%s\n%ld : %ld\n", "8 : ", phdr->p_vaddr, PGSIZE);
+  // printf("\n%d : %d\n", phdr->p_vaddr, PGSIZE);
   /* Disallow mapping page 0.
      Not only is it a bad idea to map page 0, but if we allowed
      it then user code that passed a null pointer to system calls
@@ -396,7 +410,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
   if (phdr->p_vaddr < PGSIZE);
     // return false;
 
-  printf("%s\n", "9");
+  // printf("%s\n", "9");
   /* It's okay. */
   return true;
 }
@@ -423,11 +437,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
   ASSERT (pg_ofs (upage) == 0);
   ASSERT (ofs % PGSIZE == 0);
 
-  printf("%s\n", "seeking file");
+  // printf("%s\n", "seeking file");
   file_seek (file, ofs);
   while (read_bytes > 0 || zero_bytes > 0) 
     {
-      printf("%s\n", "infi");
+      // printf("%s\n", "infi");
       /* Calculate how to fill this page.
          We will read PAGE_READ_BYTES bytes from FILE
          and zero the final PAGE_ZERO_BYTES bytes. */
@@ -468,54 +482,62 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 static bool
 setup_stack (void **esp, const char *cmdline) 
 {
-  printf("%s\n", "setup stack");
-  ASSERT(sizeof(cmdline)>0);
-  ASSERT(sizeof(cmdline)<0);
+  // printf("\nsetup stack with cmdline : %s\n", cmdline);
   
   uint8_t *kpage;
   bool success = false;
 
   kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+  // printf("%s\n", "got page");
   if (kpage != NULL) {
     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
     if (success){
+      // printf("%s\n", "building stack");
       *esp = PHYS_BASE;
       char *arg, *save_ptr;
       int argc = 0, def_argc = 2;
       char **argv = malloc( sizeof(char *)*def_argc*2);
-      
-      
-      *esp = PHYS_BASE - sizeof(cmdline) - 1;
+      char *cmdline_copy = malloc(strlen(cmdline)+1);
+      strlcpy(cmdline_copy, cmdline, strlen(cmdline)+1);
+ 
+      // printf("%s\n", "building stack 2");
+      *esp = PHYS_BASE - strlen(cmdline) - 1;
       for (arg = strtok_r ((char *)cmdline, " ", &save_ptr); arg != NULL;arg = strtok_r (NULL, " ", &save_ptr)){
-        *esp -= sizeof(arg)+1;
         
         // store pointers to arguments
         argv[argc++] = *esp;
-
+        
+        // printf("%d argument %s stack pointer %d\n", argc-1, arg,PHYS_BASE - *esp);
         // push arguments to the stack
-        memcpy (*esp, arg, sizeof(arg)+1);
-
+        memcpy (*esp, arg, strlen(arg)+1);
+        *esp += strlen(arg)+1;
         // resize argv if required
         if(argc > def_argc){
           def_argc*=2;
           argv = (char **)realloc(argv, sizeof(char *)*def_argc*2);
         }
       }
+      // printf("\nbuilding stack 3 : %s\n", cmdline_copy);
       argv[argc] = 0;
-
+      // printf("%s\n", "building stack 3.2");
+      *esp = PHYS_BASE - strlen(cmdline_copy) - 1;
+      // hex_dump(*esp, *esp, PHYS_BASE - *esp, 1); 
       // word-align
       int i = ((size_t)*esp) % 4;
-      while(i--){
-        *esp-- = 0;
+      // printf("%d\n",i);
+      // printf("%s\n", "building stack 3.5");
+      if(i){
+        *esp -= i;  
+        memcpy(*esp, &argv[argc], i);
       }
-
+      // printf("%s\n", "building stack 3.8");
       // push address of arguments
       int num_args = argc;
       while(num_args-- >= 0){
         *esp -= sizeof(char *);
         memcpy (*esp, &argv[num_args], sizeof(char *));
       }
-
+      // printf("%s\n", "building stack 4");
       // push argv
       *esp -= sizeof(char *);
       memcpy (*esp, &argv[0], sizeof(char *));
@@ -523,20 +545,25 @@ setup_stack (void **esp, const char *cmdline)
       // push argc
       *esp -= sizeof(int);
       memcpy (*esp, &argc, sizeof(int));
-
+      // printf("%s\n", "building stack 5");
       // push return address
       *esp -= sizeof(void *);
       memcpy (*esp, &argv[argc], sizeof(void *));
-
+      // printf("%s\n", "building stack 6");
       num_args = argc;
-      while(num_args-- >= 0){
-        free(argv[num_args]);
-      }
+      // printf("%s\n", "freeing argv");
+     
       free(argv);
-    }
-    else
+    
+    // printf("%s\n", "building stack 8");
+    }else{
       palloc_free_page (kpage);
+      // printf("%s\n", "building stack 9");
+    }
   }
+  // printf("\n\n%s\n\n", "dumping");
+  hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
+  // printf("total stack size : %d", PHYS_BASE - *esp);
   return success;
 }
 

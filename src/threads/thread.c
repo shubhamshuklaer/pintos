@@ -344,23 +344,23 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  printf("%s\n", "thread exit");
+  // printf("%s\n", "thread exit");
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
   process_exit ();
 #endif
-  printf("%s\n", "process exit");
+  // printf("%s\n", "process exit");
   /* Remove thread from all threads list, set our status to dying,
      and schedule another process.  That process will destroy us
      when it call schedule_tail(). */
   intr_disable ();
   list_remove (&thread_current()->allelem);
-  printf("%s\n", "ok");
+  // printf("%s\n", "ok");
   thread_current ()->status = THREAD_DYING;
   schedule ();
   NOT_REACHED ();
-  printf("%s\n", "exit thread");
+  // printf("%s\n", "exit thread");
 }
 
 /* Yields the CPU.  The current thread is not put to sleep and
@@ -492,7 +492,7 @@ static void
 kernel_thread (thread_func *function, void *aux) 
 {
   ASSERT (function != NULL);
-
+  // printf("\n", "executing function");
   intr_enable ();       /* The scheduler runs with interrupts off. */
   function (aux);       /* Execute the thread function. */
   thread_exit ();       /* If function() returns, kill the thread. */
@@ -693,6 +693,9 @@ bool insert_in_ready_heap(struct thread *t){
       num_threads_ready++;
     }
   }
+int i;
+for(i=0;i<num_threads_ready;i++)
+	// printf("%s--%s-%d\n",thread_current()->name,ready_heap[i]->name,ready_heap[i]->priority);
   return true;
 }
 
