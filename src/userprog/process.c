@@ -495,13 +495,23 @@ setup_stack (void **esp, const char *cmdline)
       // printf("%s\n", "building stack");
       *esp = PHYS_BASE;
       char *arg, *save_ptr;
-      int argc = 0, def_argc = 2;
+      int argc = 0, def_argc = 2, cmdline_len = strlen(cmdline), cmdline_ptr;
       char **argv = malloc( sizeof(char *)*def_argc*2);
       char *cmdline_copy = malloc(strlen(cmdline)+1);
       strlcpy(cmdline_copy, cmdline, strlen(cmdline)+1);
- 
+
+      //  ignore trailing spaces
+      cmdline_ptr = cmdline_len-1;
+      while(cmdline_copy[cmdline_ptr--]==' ')cmdline_len--;
+      // ignore multiple white-spaces
+      while(--cmdline_ptr){
+        if(cmdline_copy[cmdline_ptr]==' '){
+          if(cmdline_copy[cmdline_ptr-1]==' ')cmdline_len--;
+        }
+      }
+
       // printf("%s\n", "building stack 2");
-      *esp = PHYS_BASE - strlen(cmdline) - 1;
+      *esp = PHYS_BASE - cmdline_len - 1;
       for (arg = strtok_r ((char *)cmdline, " ", &save_ptr); arg != NULL;arg = strtok_r (NULL, " ", &save_ptr)){
         
         // store pointers to arguments
@@ -520,7 +530,7 @@ setup_stack (void **esp, const char *cmdline)
       // printf("\nbuilding stack 3 : %s\n", cmdline_copy);
       argv[argc] = 0;
       // printf("%s\n", "building stack 3.2");
-      *esp = PHYS_BASE - strlen(cmdline_copy) - 1;
+      *esp = PHYS_BASE - cmdline_len - 1;
       // hex_dump(*esp, *esp, PHYS_BASE - *esp, 1); 
       // word-align
       int i = ((size_t)*esp) % 4;
