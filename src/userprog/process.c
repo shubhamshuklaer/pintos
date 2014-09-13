@@ -71,7 +71,9 @@ start_process (void *cmdline_)
   if_.cs = SEL_UCSEG;
   if_.eflags = FLAG_IF | FLAG_MBS;
   success = load (cmdline, &if_.eip, &if_.esp);
+  // printf("eip : %p, esp: %p\n", &if_.eip, &if_.esp);
 
+  
 
   /* If load failed, quit. */
   palloc_free_page (cmdline);
@@ -90,6 +92,7 @@ start_process (void *cmdline_)
      we just point the stack pointer (%esp) to our stack frame
      and jump to it. */
   asm volatile ("movl %0, %%esp; jmp intr_exit" : : "g" (&if_) : "memory");
+  printf("\nreached\n");
   NOT_REACHED ();
 }
 
@@ -504,10 +507,11 @@ setup_stack (void **esp, const char *cmdline)
       cmdline_ptr = cmdline_len-1;
       while(cmdline_copy[cmdline_ptr--]==' ')cmdline_len--;
       // ignore multiple white-spaces
-      while(--cmdline_ptr){
+      while(cmdline_ptr){
         if(cmdline_copy[cmdline_ptr]==' '){
           if(cmdline_copy[cmdline_ptr-1]==' ')cmdline_len--;
         }
+        cmdline_ptr--;
       }
 
       // printf("%s\n", "building stack 2");
@@ -543,15 +547,23 @@ setup_stack (void **esp, const char *cmdline)
       // printf("%s\n", "building stack 3.8");
       // push address of arguments
       int num_args = argc;
-      while(num_args-- >= 0){
+      while(num_args > 0){
         *esp -= sizeof(char *);
         memcpy (*esp, &argv[num_args], sizeof(char *));
+        num_args--;
       }
       // printf("%s\n", "building stack 4");
-      // push argv
+
+      //push argv[0]
       *esp -= sizeof(char *);
       memcpy (*esp, &argv[0], sizeof(char *));
+
+      arg = *esp;
+      // push argv
+      *esp -= sizeof(char **);
+      memcpy (*esp, &arg, sizeof(char **));
       
+      // printf("\narc: %d\n", argc);
       // push argc
       *esp -= sizeof(int);
       memcpy (*esp, &argc, sizeof(int));
@@ -573,6 +585,7 @@ setup_stack (void **esp, const char *cmdline)
   }
   // printf("\n\n%s\n\n", "dumping");
   hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
+
   // printf("total stack size : %d", PHYS_BASE - *esp);
   return success;
 }

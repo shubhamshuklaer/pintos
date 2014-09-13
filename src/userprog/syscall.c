@@ -1,12 +1,31 @@
 #include "userprog/syscall.h"
+#include "userprog/process.h"
+
 #include <stdio.h>
 #include <syscall-nr.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include "threads/malloc.h"
+#include "threads/vaddr.h"
+#include "threads/init.h"
+#include "lib/string.h"
 
 static void syscall_handler (struct intr_frame *);
 
-void
+void halt (struct intr_frame *f);
+void exit (struct intr_frame *f);
+void exec (struct intr_frame *f);
+void wait (struct intr_frame *f);
+void create (struct intr_frame *f);
+void remove (struct intr_frame *f);
+void open (struct intr_frame *f);
+void filesize (struct intr_frame *f);
+void read (struct intr_frame *f);
+void write (struct intr_frame *f);
+void seek (struct intr_frame *f);
+void tell (struct intr_frame *f);
+void close (struct intr_frame *f);
+
 syscall_init (void) 
 {
   intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -18,6 +37,21 @@ syscall_init (void)
 static void
 syscall_handler (struct intr_frame *f )// UNUSED 
 {
+  // backing up registers
+  uint32_t edi_backup = f->edi ;               /* Saved EDI. */
+  uint32_t esi_backup = f->esi ;               /* Saved ESI. */
+  uint32_t ebp_backup = f->ebp ;               /* Saved EBP. */
+  uint32_t esp_dummy_backup = f->esp_dummy ;         /* Not used. */
+  uint32_t ebx_backup = f->ebx ;               /* Saved EBX. */
+  uint32_t edx_backup = f->edx ;               /* Saved EDX. */
+  uint32_t ecx_backup = f->ecx ;               /* Saved ECX. */
+  uint32_t eax_backup = f->eax ;               /* Saved EAX. */
+  uint16_t gs_backup = f->gs ;           /* Saved GS segment register. */
+  uint16_t fs_backup = f->fs ;           /* Saved FS segment register. */
+  uint16_t es_backup = f->es ;           /* Saved ES segment register. */
+  uint16_t ds_backup = f->ds ;           /* Saved DS segment register. */
+  uint32_t eflags_backup = f->eflags;            /* Saved CPU flags. */
+
   // printf ("system call!\n");
   // printf ("edi : %d\n", f->edi);
   // printf ("esi : %d\n", f->esi);
@@ -33,17 +67,21 @@ syscall_handler (struct intr_frame *f )// UNUSED
   // printf ("ds : %d\n", f->ds);
   // printf ("vec_no : %d\n", f->vec_no);
   // printf ("frame_pointer : %d\n", f->frame_pointer);
-  // printf ("*eip : %d\n", f->eip);
+  // printf ("eip: %p\n", f->eip);
   // printf ("cs : %d\n", f->cs);
   // printf ("eflags : %d\n", f->eflags);
-  // printf ("*esp : %d\n", f->esp);
+  // printf ("esp : %p\n", f->esp);
   // printf ("ss : %d\n", f->ss);
 
-	int *ptr = f->esp;
-  f->esp -= sizeof(int);
-  printf("%d\n", *ptr);
+  // dump stack
+  // printf("\n-----------------------------------\n");
+  // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  // printf("\n-----------------------------------\n");
+
+  int *ptr = f->esp;
+  // printf("%d\n", *ptr);
   
-  switch(ptr){
+  switch(*ptr){
     case SYS_HALT:
       halt(f);
       break;
@@ -89,11 +127,64 @@ syscall_handler (struct intr_frame *f )// UNUSED
   }
 
   
-
+  // f->esp = f->eip;
+  
   // thread_exit ();
+
+  // restoring registers
+  f->edi = edi_backup ;               /* Saved EDI. */
+  f->esi = esi_backup ;               /* Saved ESI. */
+  f->ebp = ebp_backup ;               /* Saved EBP. */
+  f->esp_dummy = esp_dummy_backup ;         /* Not used. */
+  f->ebx = ebx_backup ;               /* Saved EBX. */
+  f->edx = edx_backup ;               /* Saved EDX. */
+  f->ecx = ecx_backup ;               /* Saved ECX. */
+  f->eax = eax_backup ;               /* Saved EAX. */
+  f->gs = gs_backup ;           /* Saved GS segment register. */
+  f->fs = fs_backup ;           /* Saved FS segment register. */
+  f->es = es_backup ;           /* Saved ES segment register. */
+  f->ds = ds_backup ;
+
+  return;
 }
 
-/* Invokes syscall NUMBER, passing no arguments, and returns the
+/* Reads a byte at user virtual address UADDR.
+UADDR must be below PHYS_BASE.
+Returns the byte value if successful, -1 if a segfault
+occurred. */
+static int
+get_user (const uint8_t *uaddr)
+{
+  int result;
+  asm ("movl $1f, %0; movzbl %1, %0; 1:"
+  : "=&a" (result) : "m" (*uaddr));
+  return result;
+}
+
+bool validate_user(const uint8_t *uaddr, size_t size){
+  // printf("address to be validated : %p\n", uaddr);
+  if(!uaddr){
+    // printf("\nvalidation failed");
+    return false;
+  }
+  void *ptr = uaddr;
+  if(!is_user_vaddr(uaddr)){
+    // printf("\nvalidation failed");
+    return false;
+  }
+  if(!is_user_vaddr(uaddr + size - 1)){
+    // printf("\nvalidation failed");
+    return false;
+  }
+  
+  return true;
+}
+
+
+
+/* 
+
+  Invokes syscall NUMBER, passing no arguments, and returns the
    return value as an `int'. 
 #define syscall0(NUMBER)                                        \
         ({                                                      \
@@ -165,11 +256,18 @@ halt (void)
 }
 
 */
-
 void halt (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "halt syscall !");
   int *ptr = f->esp;
   
-
+  power_off();
+  thread_exit ();
+  return;
 }
 
 /*
@@ -182,27 +280,51 @@ exit (int status)
 }
 
 */
-
 void exit (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "exit syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve status
+  int status = *ptr;
+  ptr ++;
+  printf("status : %d\n", status);
+  f->eax = status;
+  thread_exit ();
+  return;
 }
 
 /*
 
 pid_t
-exec (const char *file)
+exec (const char *cmd_line)
 {
-  return (pid_t) syscall1 (SYS_EXEC, file);
+  return (pid_t) syscall1 (SYS_EXEC, cmd_line);
 }
 
 */
-
 void exec (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "exec syscall !");
   int *ptr = f->esp;
   
+  // retrieve file
+  const char *cmd_line = (char *)*ptr;
+  ptr ++;
 
+  int pid = process_execute(cmd_line);
+
+  f->eax = pid;
+  // thread_exit();
+  return;
 }
 
 /*
@@ -214,11 +336,21 @@ wait (pid_t pid)
 }
 
 */
-
 void wait (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "wait syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve pid
+  int pid = *ptr;
+  ptr ++;
+  
+  thread_exit();
+  return;
 }
 
 /*
@@ -230,11 +362,25 @@ create (const char *file, unsigned initial_size)
 }
 
 */
-
 void create (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "create syscall !");
   int *ptr = f->esp;
   
+  // retrieve file
+  const char *file = (char *)*ptr;
+  ptr ++;
+  
+  // retrieve initial_size 
+  unsigned initial_size = *ptr;
+  ptr ++;
 
+  thread_exit();
+  return;  
 }
 
 /*
@@ -246,11 +392,21 @@ remove (const char *file)
 }
 
 */
-
 void remove (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "remove syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve file
+  const char *file = (char *)*ptr;
+  ptr ++;
+  
+  thread_exit();
+  return;
 }
 
 /*
@@ -262,11 +418,21 @@ open (const char *file)
 }
 
 */
-
 void open (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "open syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve file
+  const char *file = (char *)*ptr;
+  ptr += sizeof(char *);
+  
+  thread_exit();
+  return;
 }
 
 /*
@@ -278,11 +444,21 @@ filesize (int fd)
 }
 
 */
-
 void filesize (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "filesize syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
+  
+  thread_exit();
+  return;
 }
 
 /*
@@ -294,14 +470,38 @@ read (int fd, void *buffer, unsigned size)
 }
 
 */
-
-
-
 void read (struct intr_frame *f){
-  int *ptr = f->esp;
-  int fd, const void *buffer, unsigned size;
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
 
+  printf("%s\n", "read syscall !");
+  int *ptr = f->esp;
+  ptr ++;
+
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
+
+  // retrieve buffer
+  char *buffer_ptr = (char *)*ptr;
+  ptr ++;
+
+  //retrieve size
+  unsigned size = *ptr;
+  ptr ++;
+
+  char *buffer = malloc(size+1);
+  memcpy(buffer, buffer_ptr, size);
+
+  if(size && buffer_ptr){
+
+  }
+  thread_exit();
+  return;
 }
+
 /*
 
 int
@@ -311,13 +511,74 @@ write (int fd, const void *buffer, unsigned size)
 }
 
 */
-
 void write (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("\n%s\n", "write syscall !");
   int *ptr = f->esp;
-  int fd, const void *buffer, unsigned size;
+  ptr ++;
+  // printf ("ptr : %p\n", ptr);
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
+  // printf ("ptr : %p\n", ptr);
+
+  // retrieve buffer
+  char *buffer_ptr = (char *)*ptr;
+  
+  ptr ++;
+  // printf ("ptr : %p\n", ptr);
+  //retrieve size
+  unsigned size = *ptr;
+  ptr ++;
+
+  // validate user-provided buffer
+  if(!validate_user(buffer_ptr, size)){
+    f->eax = 0;
+    return;
+  }
+  unsigned siz = size;
+  if(siz){
+    char *buffer = malloc(siz+1);
+    memcpy(buffer, buffer_ptr, siz);
+    buffer_ptr = buffer;
+    
+    printf("size : %d\nbuffer : %s\nfd : %d\n", size, (char *)buffer, fd);
+
+    // write to console if fd==1
+    if(fd == 1){
+      while(siz > 100){
+        putbuf (buffer_ptr, 100);
+        buffer_ptr += 100;
+        siz -= 100;
+      }
+      if(siz)putbuf(buffer_ptr, siz);
+      f->eax = size;
+      return;
+    }
+    else if(fd == 0){
+      //error - can't write to STDIN
+    }else{
+
+    }
+  }else{
+    f->eax = 0;
+    return;
+  }
 
 
+  // f->esp = ptr;
+  // printf ("ptr : %p\n", ptr);
+  // printf ("esp : %p\n", f->esp);
+  
+  printf("%s\n", "write syscall finished!");
+  // thread_exit();
+  return;
 }
+
 /*
 
 void
@@ -328,10 +589,27 @@ seek (int fd, unsigned position)
 
 */
 void seek (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "seek syscall !");
   int *ptr = f->esp;
   
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
 
+  // retrieve position 
+  unsigned position = *ptr;
+  ptr ++;
+  
+  
+  thread_exit();
+  return;
 }
+
 /*
 
 unsigned
@@ -340,21 +618,47 @@ tell (int fd)
   return syscall1 (SYS_TELL, fd);
 }
 
-*/void tell (struct intr_frame *f){
+*/
+void tell (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "tell syscall !");
   int *ptr = f->esp;
   
-
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
+  
+  thread_exit();
+  return;
 }
+
 /*
 
-oid
+void
 close (int fd)
 {
   syscall1 (SYS_CLOSE, fd);
 }
 
-*/void close (struct intr_frame *f){
+*/
+void close (struct intr_frame *f){
+  // hex_dump
+  printf("\n-----------------------------------\n");
+  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  printf("\n-----------------------------------\n");
+
+  printf("%s\n", "close syscall !");
   int *ptr = f->esp;
   
-
+  
+  // retrieve fd
+  int fd = *ptr;
+  ptr ++;
+  
+  thread_exit();
+  return;
 }

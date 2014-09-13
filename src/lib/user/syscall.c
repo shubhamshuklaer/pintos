@@ -78,9 +78,9 @@ exit (int status)
 }
 
 pid_t
-exec (const char *file)
+exec (const char *cmd_line)
 {
-  return (pid_t) syscall1 (SYS_EXEC, file);
+  return (pid_t) syscall1 (SYS_EXEC, cmd_line);
 }
 
 int
@@ -141,7 +141,7 @@ void
 close (int fd)
 {
   syscall1 (SYS_CLOSE, fd);
-}
+} 
 //////////////////////////////////////////////////////////////////////////
 mapid_t
 mmap (int fd, void *addr)
