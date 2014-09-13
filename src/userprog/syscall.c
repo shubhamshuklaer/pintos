@@ -282,9 +282,9 @@ exit (int status)
 */
 void exit (struct intr_frame *f){
   // hex_dump
-  printf("\n-----------------------------------\n");
-  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-  printf("\n-----------------------------------\n");
+  // printf("\n-----------------------------------\n");
+  // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  // printf("\n-----------------------------------\n");
 
   printf("%s\n", "exit syscall !");
   int *ptr = f->esp;
@@ -513,11 +513,11 @@ write (int fd, const void *buffer, unsigned size)
 */
 void write (struct intr_frame *f){
   // hex_dump
-  printf("\n-----------------------------------\n");
-  hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-  printf("\n-----------------------------------\n");
+  // printf("\n-----------------------------------\n");
+  // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+  // printf("\n-----------------------------------\n");
 
-  printf("\n%s\n", "write syscall !");
+  // printf("\n%s\n", "write syscall !");
   int *ptr = f->esp;
   ptr ++;
   // printf ("ptr : %p\n", ptr);
@@ -544,18 +544,18 @@ void write (struct intr_frame *f){
   if(siz){
     char *buffer = malloc(siz+1);
     memcpy(buffer, buffer_ptr, siz);
-    buffer_ptr = buffer;
     
-    printf("size : %d\nbuffer : %s\nfd : %d\n", size, (char *)buffer, fd);
+    // printf("size : %d\nfd : %d\n", size, fd);
 
     // write to console if fd==1
     if(fd == 1){
+      // printf("writing to console\n");
       while(siz > 100){
-        putbuf (buffer_ptr, 100);
-        buffer_ptr += 100;
+        putbuf (buffer, 100);
+        buffer += 100;
         siz -= 100;
       }
-      if(siz)putbuf(buffer_ptr, siz);
+      if(siz)putbuf(buffer, siz);
       f->eax = size;
       return;
     }
@@ -574,7 +574,7 @@ void write (struct intr_frame *f){
   // printf ("ptr : %p\n", ptr);
   // printf ("esp : %p\n", f->esp);
   
-  printf("%s\n", "write syscall finished!");
+  // printf("%s\n", "write syscall finished!");
   // thread_exit();
   return;
 }

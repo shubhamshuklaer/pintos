@@ -106,7 +106,7 @@ start_process (void *cmdline_)
    This function will be implemented in problem 2-2.  For now, it
    does nothing. */
 int
-process_wait (tid_t child_tid UNUSED) 
+process_wait (tid_t child_tid )// UNUSED 
 {
   return -1;
 }
@@ -584,7 +584,7 @@ setup_stack (void **esp, const char *cmdline)
     }
   }
   // printf("\n\n%s\n\n", "dumping");
-  hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
+  // hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
 
   // printf("total stack size : %d", PHYS_BASE - *esp);
   return success;
