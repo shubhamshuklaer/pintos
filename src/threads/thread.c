@@ -45,6 +45,8 @@ static struct thread *initial_thread;
 /* Lock used by allocate_tid(). */
 static struct lock tid_lock;
 
+static int max_tid = 0;
+
 /* Stack frame for kernel_thread(). */
 struct kernel_thread_frame 
   {
@@ -254,26 +256,26 @@ thread_create (const char *name, int priority,
   intr_set_level (old_level);
 
   /* Set this to be a child thread of current thread */
-  printf("setting child parameters\n");
   int parent_tid = thread_tid();
-  printf("current process tid : %d\n", parent_tid);
+  // printf("setting child parameters for current process(tid) : %d\n", parent_tid);
   struct thread *parent_thread = thread_current();
   t->parent = parent_thread;
   t->num_child_procs = 0;
+  t->exit_status = 2;
   parent_thread->num_child_procs++;
-  printf("thread create 1\n");
+  // printf("thread create 1\n");
   if(&t->child_procs){
-    printf("list not null\n");
+    // printf("child proc list not null\n");
   }else{
-    printf("list null\n");
+    // printf("child proc list null\n");
   }
-  printf("thread create 2\n");
+  // printf("thread create 2\n");
   list_init(&t->child_procs);
-  printf("thread create 3\n");
+  // printf("thread create 3\n");
 
   list_push_back(&parent_thread->child_procs, &t->child_proc);
-
-  printf("thread create 4\n");
+  list_push_back (&all_list, &t->allelem);
+  // printf("thread create 4\n");
 
   /* Add to run queue. */
   thread_unblock (t);
@@ -334,6 +336,43 @@ thread_unblock (struct thread *t)
 
 }
 
+void
+thread_listall(){
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
+    struct thread *ptr = list_entry (e, struct thread, allelem);
+    // printf("\n-----------------------------------\n");
+    // printf("thread name; %s\n", ptr->name);
+    // printf("thread exit status: %d\n", ptr->exit_status);
+    // printf("thread num child procs: %d\n", ptr->num_child_procs);
+    // printf("\n-----------------------------------\n");
+    
+  }  
+}
+
+
+bool
+valid_tid(tid_t tid){
+  // printf("tid to be validated : %d\n", tid);
+  // printf("max tid: %d\n", max_tid);
+  return (tid <= max_tid && tid >=0);
+}
+
+bool
+thread_alive(tid_t tid){
+  struct list_elem *e;
+
+  for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
+    struct thread *ptr = list_entry (e, struct thread, allelem);
+    if(ptr->tid == tid){
+      return true;
+      break;
+    }
+  }
+  return false;
+}
+
 /* Returns the name of the running thread. */
 const char *
 thread_name (void) 
@@ -364,7 +403,7 @@ thread_current (void)
 tid_t
 thread_tid (void) 
 {
-  printf("asking current threads id\n");
+  // printf("asking current threads id\n");
   return thread_current ()->tid;
 }
 
@@ -373,7 +412,7 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  printf("destroying thread with id : %d\n", thread_current()->tid);
+  // printf("destroying thread with id : %d\n", thread_current()->tid);
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
@@ -701,6 +740,7 @@ allocate_tid (void)
   lock_release (&tid_lock);
 
   // printf("allocating new tid : %d\n", tid);
+  max_tid = tid;
   return tid;
 }
 

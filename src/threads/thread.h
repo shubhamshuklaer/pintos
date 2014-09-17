@@ -106,6 +106,7 @@ struct thread
     int num_child_procs;
     struct list child_procs;
     struct list_elem child_proc;
+    int exit_status;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -123,6 +124,10 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+
+bool thread_alive (tid_t tid);
+bool valid_tid(tid_t tid);
+void thread_listall(void);
 
 void thread_tick (void);
 void thread_print_stats (void);
