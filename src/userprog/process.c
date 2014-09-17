@@ -19,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "lib/string.h"
 
@@ -32,7 +33,7 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmdline) 
 {
-  thread_listall();
+  // thread_listall();
   // printf("process to be executed: '%s'\n", cmdline);
   char *fn_copy;
   tid_t tid;
@@ -52,7 +53,11 @@ process_execute (const char *cmdline)
   tid = thread_create (file_name, PRI_DEFAULT+1, start_process, fn_copy);
   
   // wait until start process returns
-
+  int wait_load = 1;
+  while(wait_load){
+    wait_load = thread_current()->child_loading.value;
+    // printf("child still loading for thread - '%s' : %d\n", thread_current()->name, wait_load);
+  }
 
   // printf("%s\n", "created thread"); 
   if (tid == TID_ERROR){
@@ -87,17 +92,24 @@ start_process (void *cmdline_)
   
 
   /* If load failed, quit. */
+  // printf("sema down for : '%s', from %d\n", thread_current()->parent->name, thread_current()->parent->child_loading.value);
+
+  bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
   
   if (!success){
     // printf("%s\n", "not successful");
+    palloc_free_page (cmdline);
+    thread_current()->exit_status = 1;
+    printf ("%s: exit(%d)\n", thread_current()->name, -1);
     thread_exit ();
     // printf("%s\n", "not at all successful");
   }else{
     // printf("\nstarting  process : '%s'\n", (char *)cmdline);
     // printf("%s\n", "successful");
+    
   }
-
   palloc_free_page (cmdline);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -125,9 +137,10 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid )// UNUSED 
 {
-  thread_listall();
+  // thread_listall();
   // invalid tid;
   if(!valid_tid(child_tid))return -1;
+  // if(!active_tid(child_tid))return -1;
 
   // printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
   // printf("child thread id : %d\n", child_tid);
@@ -162,7 +175,7 @@ process_wait (tid_t child_tid )// UNUSED
 void
 process_exit (void)
 {
-  thread_listall();
+  // thread_listall();
   // printf("exiting process\n");
   struct thread *cur = thread_current ();
   // printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
