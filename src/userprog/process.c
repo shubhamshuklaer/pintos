@@ -668,3 +668,8 @@
     return (pagedir_get_page (t->pagedir, upage) == NULL
             && pagedir_set_page (t->pagedir, upage, kpage, writable));
   }
+
+
+  int process_add_file(struct file *file_ptr){
+    
+  }

@@ -8,8 +8,11 @@
   #include "threads/malloc.h"
   #include "threads/vaddr.h"
   #include "threads/init.h"
+  #include "threads/synch.h"
   #include "lib/string.h"
-
+  #include "filesys/file.h"
+  #include "filesys/filesys.h"
+  #include <stdbool.h>
   static void syscall_handler (struct intr_frame *);
 
   void halt (struct intr_frame *f);
@@ -402,14 +405,20 @@
     int *ptr = f->esp;
     
     // retrieve file
-    const char *file = (char *)*ptr;
+    const char *file_name = (char *)*ptr;
     ptr ++;
     
     // retrieve initial_size 
     unsigned initial_size = *ptr;
     ptr ++;
-
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    if(filesys_create (file_name,initial_size)){
+       lock_release(&filesys_lock);
+       f->eax=true;
+    }else{ 
+        lock_release(&filesys_lock);
+        f->eax=false;
+    }
     return;  
   }
 
@@ -432,10 +441,16 @@
     int *ptr = f->esp;
     
     // retrieve file
-    const char *file = (char *)*ptr;
-    ptr ++;
-    
-    thread_exit();
+    const char *file_name = (char *)*ptr;
+    ptr ++; 
+    lock_acquire(&filesys_lock);
+    if(filesys_remove (file_name)){
+        lock_release(&filesys_lock);
+        f->eax=true;
+    }else{ 
+        lock_release(&filesys_lock);
+        f->eax=false;
+    }
     return;
   }
 
@@ -458,10 +473,17 @@
     int *ptr = f->esp;
     
     // retrieve file
-    const char *file = (char *)*ptr;
+    const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
-    
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file * file_ptr=filesys_open(file_name);
+    if(f!=NULL){
+       lock_release(&filesys_lock);
+       f->eax=process_add_file(file_ptr);
+    }else{
+       lock_release(&filesys_lock);
+       f->eax=-1;
+    } 
     return;
   }
 
@@ -487,6 +509,8 @@
     int fd = *ptr;
     ptr ++;
     
+    lock_acquire(&filesys_lock);
+       lock_release(&filesys_lock);
     thread_exit();
     return;
   }
