@@ -10,7 +10,7 @@
    list_elem's.  The list_entry macro allows conversion from a
    struct list_elem back to a structure object that contains it.
 
-   For example, suppose there is a needed for a list of `struct
+   For example, suppose there is a need for a list of `struct
    foo'.  `struct foo' should contain a `struct list_elem'
    member, like so:
 

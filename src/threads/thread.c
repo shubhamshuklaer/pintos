@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <list.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -69,7 +70,6 @@ bool thread_mlfqs;
 static void kernel_thread (thread_func *, void *aux);
 
 static void idle (void *aux UNUSED);
-static struct thread *running_thread (void);
 static struct thread *next_thread_to_run (void);
 static void init_thread (struct thread *, const char *name, int priority);
 static void *alloc_frame (struct thread *, size_t size);
@@ -110,15 +110,21 @@ static long long ready_insertion_rank;
 void
 thread_init (void) 
 {
+  printf("thread init\n");
   ASSERT (intr_get_level () == INTR_OFF);
   lock_init (&tid_lock);
   list_init (&all_list);
   list_init (&sleep_list);
   /* Set up a thread structure for the running thread. */
+  // printf("thread init 1\n");
   initial_thread = running_thread ();
+  // printf("thread init 2\n");
   init_thread (initial_thread, "main", PRI_DEFAULT);
+  // printf("thread init 3\n");
   initial_thread->status = THREAD_RUNNING;
+  // printf("thread init 4\n");
   initial_thread->tid = allocate_tid ();
+  // printf("thread init exit\n");
 }
 
 /* Starts preemptive thread scheduling by enabling interrupts.
@@ -247,6 +253,28 @@ thread_create (const char *name, int priority,
 
   intr_set_level (old_level);
 
+  /* Set this to be a child thread of current thread */
+  printf("setting child parameters\n");
+  int parent_tid = thread_tid();
+  printf("current process tid : %d\n", parent_tid);
+  struct thread *parent_thread = thread_current();
+  t->parent = parent_thread;
+  t->num_child_procs = 0;
+  parent_thread->num_child_procs++;
+  printf("thread create 1\n");
+  if(&t->child_procs){
+    printf("list not null\n");
+  }else{
+    printf("list null\n");
+  }
+  printf("thread create 2\n");
+  list_init(&t->child_procs);
+  printf("thread create 3\n");
+
+  list_push_back(&parent_thread->child_procs, &t->child_proc);
+
+  printf("thread create 4\n");
+
   /* Add to run queue. */
   thread_unblock (t);
 
@@ -336,6 +364,7 @@ thread_current (void)
 tid_t
 thread_tid (void) 
 {
+  printf("asking current threads id\n");
   return thread_current ()->tid;
 }
 
@@ -344,7 +373,7 @@ thread_tid (void)
 void
 thread_exit (void) 
 {
-  // printf("%s\n", "thread exit");
+  printf("destroying thread with id : %d\n", thread_current()->tid);
   ASSERT (!intr_context ());
 
 #ifdef USERPROG
@@ -538,6 +567,18 @@ init_thread (struct thread *t, const char *name, int priority)
   t->waiting_on_lock = NULL;
   list_init(&(t->donations));
   list_push_back (&all_list, &t->allelem);
+
+  // initialize child processes
+  // printf("init thread 1\n");  
+  t->num_child_procs = 0;
+  // printf("init thread 2\n");
+  // t->child_procs = malloc(sizeof(list));
+  // printf("init thread 3\n");
+  list_init(&(t->child_procs));
+  // printf("init thread 4\n");
+  t->parent = NULL;
+  // printf("init thread 5\n");
+
 }
 
 /* Allocates a SIZE-byte frame at the top of thread T's stack and
@@ -651,6 +692,7 @@ schedule (void)
 static tid_t
 allocate_tid (void) 
 {
+
   static tid_t next_tid = 1;
   tid_t tid;
 
@@ -658,6 +700,7 @@ allocate_tid (void)
   tid = next_tid++;
   lock_release (&tid_lock);
 
+  // printf("allocating new tid : %d\n", tid);
   return tid;
 }
 
@@ -695,7 +738,7 @@ bool insert_in_ready_heap(struct thread *t){
   }
 int i;
 for(i=0;i<num_threads_ready;i++)
-	// printf("%s--%s-%d\n",thread_current()->name,ready_heap[i]->name,ready_heap[i]->priority);
+  // printf("%s--%s-%d\n",thread_current()->name,ready_heap[i]->name,ready_heap[i]->priority);
   return true;
 }
 

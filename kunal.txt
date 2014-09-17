@@ -5,7 +5,7 @@ make && pintos -v -k -T 60 --qemu  --fs-disk=2 -p tests/userprog/args-many -a ar
 
 ssh -X group15@172.16.24.253
 cd main/pintos/src/userprog/build/
-gedit ../syscall.c ../process.c ../../lib/user/syscall.c
+gedit ../syscall.c ../process.c ../../lib/user/syscall.c ../../threads/thread.c ../../threads/thread.h
 
 server
 -------------

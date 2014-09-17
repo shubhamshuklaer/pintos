@@ -97,8 +97,15 @@ struct thread
     struct list_elem allelem;           /* List element for all threads list. */
     struct list_elem donation_elem;     /* for adding to donation list */
     struct list donations;              /* List containing priority doners */
+    
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
+    
+    /* Shared between thread.c and process.c */
+    struct thread *parent;
+    int num_child_procs;
+    struct list child_procs;
+    struct list_elem child_proc;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -127,6 +134,8 @@ void thread_block (void);
 void thread_unblock (struct thread *);
 
 struct thread *thread_current (void);
+struct thread *running_thread (void);
+
 tid_t thread_tid (void);
 const char *thread_name (void);
 
