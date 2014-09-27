@@ -13,6 +13,55 @@
   #include "filesys/file.h"
   #include "filesys/filesys.h"
   #include <stdbool.h>
+  bool validate_user(const uint8_t *uaddr, size_t size);
+  
+  /* Reads a byte at user virtual address UADDR.
+  UADDR must be below PHYS_BASE.
+  Returns the byte value if successful, -1 if a segfault
+  occurred. */
+  static int
+  get_user (const uint8_t *uaddr)
+  {
+    validate_user(uaddr, 1);
+    // printf("getting from user address : %p\n", uaddr);
+    int result;
+    asm ("movl $1f, %0; movzbl %1, %0; 1:"
+    : "=&a" (result) : "m" (*uaddr));
+    return result;
+  }
+
+  bool validate_user(const uint8_t *uaddr, size_t size){
+    // printf("address to be validated : %p\n", uaddr);
+    if(!uaddr){
+       // printf("\nvalidation failed 1\n");
+       exit_on_error();
+      return false;
+    }
+    void *ptr = uaddr;
+    if(!is_user_vaddr(uaddr)){
+      // printf("\nvalidation failed 2\n");
+      exit_on_error();
+      return false;
+    }
+    if(!is_user_vaddr(uaddr + size - 1)){
+      // printf("\nvalidation failed 3\n");
+      exit_on_error();
+      return false;
+    }
+    if((uint8_t *)0x08048000 > uaddr  && 0x20 < uaddr){
+      // printf("\nvalidation failed 4\n");
+      exit_on_error();
+      return false;
+    }
+    // printf("\nvalidation passed\n");
+    return true;
+  }
+
+  void exit_on_error(void){
+    printf ("%s: exit(%d)\n", thread_current()->name, -1);
+    thread_exit();
+  }
+
   static void syscall_handler (struct intr_frame *);
 
   void halt (struct intr_frame *f);
@@ -41,21 +90,24 @@
   syscall_handler (struct intr_frame *f )// UNUSED 
   {
     // backing up registers
-    uint32_t edi_backup = f->edi ;               /* Saved EDI. */
-    uint32_t esi_backup = f->esi ;               /* Saved ESI. */
-    uint32_t ebp_backup = f->ebp ;               /* Saved EBP. */
-    uint32_t esp_dummy_backup = f->esp_dummy ;    /* Not used. */
-    uint32_t ebx_backup = f->ebx ;               /* Saved EBX. */
-    uint32_t edx_backup = f->edx ;               /* Saved EDX. */
-    uint32_t ecx_backup = f->ecx ;               /* Saved ECX. */
-    uint32_t eax_backup = f->eax ;               /* Saved EAX. */
-    uint16_t gs_backup = f->gs ;           /* Saved GS segment register. */
-    uint16_t fs_backup = f->fs ;           /* Saved FS segment register. */
-    uint16_t es_backup = f->es ;           /* Saved ES segment register. */
-    uint16_t ds_backup = f->ds ;           /* Saved DS segment register. */
-    uint16_t cs_backup = f->cs ;           /* Code segment for eip. */
-    uint16_t ss_backup = f->ss ;           /* Data segment for esp. */
-    uint32_t eflags_backup = f->eflags;            /* Saved CPU flags. */
+
+    // uint32_t edi_backup = f->edi ;               /* Saved EDI. */
+    // uint32_t esi_backup = f->esi ;               /* Saved ESI. */
+    // uint32_t ebp_backup = f->ebp ;               /* Saved EBP. */
+    // uint32_t esp_dummy_backup = f->esp_dummy ;    /* Not used. */
+    // uint32_t ebx_backup = f->ebx ;               /* Saved EBX. */
+    // uint32_t edx_backup = f->edx ;               /* Saved EDX. */
+    // uint32_t ecx_backup = f->ecx ;               /* Saved ECX. */
+    // uint32_t eax_backup = f->eax ;               /* Saved EAX. */
+    // uint16_t gs_backup = f->gs ;           /* Saved GS segment register. */
+    // uint16_t fs_backup = f->fs ;           /* Saved FS segment register. */
+    // uint16_t es_backup = f->es ;           /* Saved ES segment register. */
+    // uint16_t ds_backup = f->ds ;           /* Saved DS segment register. */
+    // uint16_t cs_backup = f->cs ;           /* Code segment for eip. */
+    // uint16_t ss_backup = f->ss ;           /* Data segment for esp. */
+    // uint32_t eflags_backup = f->eflags;            /* Saved CPU flags. */
+
+    // print currently saved registers
 
     // printf ("system call!\n");
     // printf ("edi : %d\n", f->edi);
@@ -79,14 +131,21 @@
     // printf ("ss : %d\n", f->ss);
 
     // dump stack
+
     // printf("\n-----------------------------------\n");
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
-    int *ptr = f->esp;
+    int ptr = get_user(f->esp);
+    // 
+    if(!validate_user((uint8_t *)ptr, 1)){
+      printf ("%s: exit(%d)\n", thread_current()->name, -1);
+      thread_exit();
+    }
+    // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
     
-    switch(*ptr){
+    switch(ptr){
       case SYS_HALT:
         halt(f);
         break;
@@ -127,7 +186,9 @@
         close(f);
         break;
       default:
-        printf ("unknown system call!\n");
+        // printf ("unknown system call!\n");
+        printf ("%s: exit(%d)\n", thread_current()->name, -1);
+        thread_exit();
         break;
     }
 
@@ -137,55 +198,25 @@
     // thread_exit ();
 
     // restoring registers
-    f->edi = edi_backup ;               /* Saved EDI. */
-    f->esi = esi_backup ;               /* Saved ESI. */
-    f->ebp = ebp_backup ;               /* Saved EBP. */
+    // f->edi = edi_backup ;               /* Saved EDI. */
+    // f->esi = esi_backup ;               /* Saved ESI. */
+    // f->ebp = ebp_backup ;               /* Saved EBP. */
     // f->esp_dummy = esp_dummy_backup ;   /* Not  used. */
     // f->ebx = ebx_backup ;               /* Saved EBX. */
     // f->edx = edx_backup ;               /* Saved EDX. */
     // f->ecx = ecx_backup ;               /* Saved ECX. */
     // f->eax = eax_backup ;               /* Saved EAX. */
-    f->gs = gs_backup ;           /* Saved GS segment register. */
-    f->fs = fs_backup ;           /* Saved FS segment register. */
-    f->es = es_backup ;           /* Saved ES segment register. */
-    f->ds = ds_backup ;
-    f->cs = cs_backup ;           /* Saved ES segment register. */
-    f->ss = ss_backup ;
+    // f->gs = gs_backup ;           /* Saved GS segment register. */
+    // f->fs = fs_backup ;           /* Saved FS segment register. */
+    // f->es = es_backup ;           /* Saved ES segment register. */
+    // f->ds = ds_backup ;
+    // f->cs = cs_backup ;           /* Saved ES segment register. */
+    // f->ss = ss_backup ;
 
     return;
   }
 
-  /* Reads a byte at user virtual address UADDR.
-  UADDR must be below PHYS_BASE.
-  Returns the byte value if successful, -1 if a segfault
-  occurred. */
-  static int
-  get_user (const uint8_t *uaddr)
-  {
-    int result;
-    asm ("movl $1f, %0; movzbl %1, %0; 1:"
-    : "=&a" (result) : "m" (*uaddr));
-    return result;
-  }
-
-  bool validate_user(const uint8_t *uaddr, size_t size){
-    // printf("address to be validated : %p\n", uaddr);
-    if(!uaddr){
-      // printf("\nvalidation failed");
-      return false;
-    }
-    void *ptr = uaddr;
-    if(!is_user_vaddr(uaddr)){
-      // printf("\nvalidation failed");
-      return false;
-    }
-    if(!is_user_vaddr(uaddr + size - 1)){
-      // printf("\nvalidation failed");
-      return false;
-    }
-    
-    return true;
-  }
+  
 
 
 
@@ -264,17 +295,19 @@
 
   */
   void halt (struct intr_frame *f){
-    printf("%s\n", "halt syscall !");
+    // printf("%s\n", "halt syscall !");
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
     
     int *ptr = f->esp;
-    
+    ptr ++;
+
+
     power_off();
-    thread_exit ();
+
     return;
   }
 
@@ -289,7 +322,8 @@
 
   */
   void exit (struct intr_frame *f){
-    printf("%s\n", "exit syscall !");
+    // printf("%s\n", "exit syscall !");
+    
     // hex_dump
     printf("stack pointer : %p\n", f->esp);
     printf("return pointer : %p\n", f->eip);
@@ -301,19 +335,23 @@
 
     
     int *ptr = f->esp;
-    
+    ptr ++;
+
+    validate_user(ptr, 1);
     // retrieve status
+    // printf("stack pointer : %p\n", ptr);
     int status = *ptr;
     ptr ++;
-    printf("status : %d\n", status);
-    f->eax = 0;
-    process_exit();
-    // thread_exit ();
-    printf("stack pointer : %p\n", f->esp);
-    printf("\n-----------------------------------\n");
-    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
 
+    // printf("exiting with status : %d\n", status);
+    f->eax = status;
+
+    // process termination message
+    printf ("%s: exit(%d)\n", thread_current()->name, status);
+    thread_current()->exit_status = status;
+    
+    thread_exit ();
+    // printf("%s\n", "exit syscall finished!");
     return;
   }
 
@@ -328,29 +366,33 @@
   */
 
   void exec (struct intr_frame *f){
-    printf("%s\n", "exec syscall !");
+    // printf("%s\n", "exec syscall !");
 
-    printf("stack pointer : %p\n", f->esp);
-    printf("return pointer : %p\n", f->eip);
-    
-    // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("stack pointer : %p\n", f->esp);
+    // printf("return pointer : %p\n", f->eip);
+
+
+    // // hex_dump
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
     
     int *ptr = f->esp;
-    
+    ptr ++;
+
     // retrieve file
+    validate_user(ptr, 1);
     const char *cmd_line = (char *)*ptr;
     ptr ++;
 
     int pid = process_execute(cmd_line);
 
-    f->eax = pid;
+
     // thread_exit();
     process_wait(pid);
     // process_exit();
+    f->eax = pid;
 
     return;
   }
@@ -365,22 +407,26 @@
 
   */
   void wait (struct intr_frame *f){
-    printf("%s\n", "wait syscall !");
+    // printf("%s\n", "wait syscall !");
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
     
     int *ptr = f->esp;
-    
+    ptr ++;
+
     // retrieve pid
+    validate_user(ptr, 1);
     int pid = *ptr;
     ptr ++;
     
+    if(!thread_alive(pid))return -1;
+
     int wait_status = process_wait(pid);
     if(wait_status == -1)f->eax = wait_status;
-    printf("done waiting\n");
+    // printf("done waiting\n");
     // thread_exit();
     return;
   }
@@ -403,8 +449,10 @@
 
     
     int *ptr = f->esp;
-    
+    ptr ++;
+
     // retrieve file
+    validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
     ptr ++;
     
@@ -439,8 +487,10 @@
 
     printf("%s\n", "remove syscall !");
     int *ptr = f->esp;
+    ptr ++;
     
     // retrieve file
+    validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
     ptr ++; 
     lock_acquire(&filesys_lock);
@@ -471,8 +521,10 @@
 
     printf("%s\n", "open syscall !");
     int *ptr = f->esp;
+    ptr ++;
     
     // retrieve file
+    validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
     lock_acquire(&filesys_lock);
@@ -503,8 +555,9 @@
     printf("\n-----------------------------------\n");
 
     printf("%s\n", "filesize syscall !");
+
     int *ptr = f->esp;
-    
+    ptr ++;
     // retrieve fd
     int fd = *ptr;
     ptr ++;
@@ -545,10 +598,12 @@
     ptr ++;
 
     // retrieve buffer
+    validate_user(ptr, 1);
     char *buffer_ptr = (char *)*ptr;
     ptr ++;
 
     //retrieve size
+    validate_user(ptr, 1);
     unsigned size = *ptr;
     ptr ++;
 
@@ -598,18 +653,23 @@
     // printf ("ptr : %p\n", ptr);
 
     // retrieve buffer
+    validate_user(ptr, 1);
     char *buffer_ptr = (char *)*ptr;
     
     ptr ++;
     // printf ("ptr : %p\n", ptr);
     //retrieve size
+    validate_user(ptr, 1);
     unsigned size = *ptr;
     ptr ++;
 
     // validate user-provided buffer
     if(!validate_user(buffer_ptr, size)){
+      // printf("user validation failed\n");
       f->eax = 0;
       return;
+    }else{
+      // printf("user validation passeddd\n");
     }
     unsigned siz = size;
     if(siz){
@@ -630,7 +690,7 @@
         f->eax = size;
         return;
       }
-      else if(fd == 0){ 
+      else if(fd == 0){
         //error - can't write to STDIN
         f->eax=-1;
       }else{
@@ -647,6 +707,7 @@
       }
     }else{
       f->eax = 0;
+
     }
 
 
@@ -676,12 +737,15 @@
 
     printf("%s\n", "seek syscall !");
     int *ptr = f->esp;
-    
+    ptr ++;
+
     // retrieve fd
+    validate_user(ptr, 1);
     int fd = *ptr;
     ptr ++;
 
     // retrieve position 
+    validate_user(ptr, 1);
     unsigned position = *ptr;
     ptr ++;
     
@@ -715,8 +779,10 @@
 
     printf("%s\n", "tell syscall !");
     int *ptr = f->esp;
-    
+    ptr ++;
+
     // retrieve fd
+    validate_user(ptr, 1);
     int fd = *ptr;
     ptr ++;
     
@@ -749,14 +815,16 @@
 
     printf("%s\n", "close syscall !");
     int *ptr = f->esp;
-    
+    ptr ++;
     
     // retrieve fd
+    validate_user(ptr, 1);
     int fd = *ptr;
     ptr ++;
     lock_acquire(&filesys_lock);
     f->eax=process_close_file(fd);
     lock_release(&filesys_lock);
     
+
     return;
   }
