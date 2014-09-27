@@ -19,3 +19,5 @@ recursor
 *.d
 *.o
 *.a
+*.o
+*.swp
