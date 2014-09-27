@@ -106,6 +106,11 @@ struct thread
     int num_child_procs;
     struct list child_procs;
     struct list_elem child_proc;
+    
+    /* file handling*/
+    struct list file_list;
+    int fd;
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

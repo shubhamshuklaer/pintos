@@ -508,10 +508,16 @@
     // retrieve fd
     int fd = *ptr;
     ptr ++;
-    
+    int file_size; 
+    struct file *file_ptr;
     lock_acquire(&filesys_lock);
-       lock_release(&filesys_lock);
-    thread_exit();
+    file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+       f->eax=-1;
+    }else{
+       f->eax=file_length(file_ptr);//form filesys/file.h     
+    } 
+    lock_release(&filesys_lock);
     return;
   }
 
@@ -712,7 +718,9 @@
     // retrieve fd
     int fd = *ptr;
     ptr ++;
+    lock_acquire(&filesys_lock);
+    f->eax=process_close_file(fd);
+    lock_release(&filesys_lock);
     
-    thread_exit();
     return;
   }
