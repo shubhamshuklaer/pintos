@@ -1,5 +1,6 @@
   #include "userprog/syscall.h"
   #include "userprog/process.h"
+
   #include <stdio.h>
   #include <syscall-nr.h>
   #include "threads/interrupt.h"
@@ -191,6 +192,11 @@
         thread_exit();
         break;
     }
+
+    
+    // f->esp = f->eip;
+    
+    // thread_exit ();
 
     // restoring registers
     // f->edi = edi_backup ;               /* Saved EDI. */

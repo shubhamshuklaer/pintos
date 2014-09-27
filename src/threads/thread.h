@@ -105,11 +105,15 @@ struct thread
     /* Shared between thread.c and process.c */
     struct thread *parent;
     
+    /* file handling*/
+    struct list file_list;
+    int fd;
+
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
-    int num_child_procs;
+	int num_child_procs;
     struct list child_procs;
     struct list_elem child_proc;
     int exit_status;
