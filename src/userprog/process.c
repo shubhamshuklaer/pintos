@@ -19,6 +19,7 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include "threads/thread.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "lib/string.h"
 
@@ -32,7 +33,8 @@ static bool load (const char *cmdline, void (**eip) (void), void **esp);
 tid_t
 process_execute (const char *cmdline) 
 {
-  // printf("%s\n", "execute process");
+  // thread_listall();
+  // printf("process to be executed: '%s'\n", cmdline);
   char *fn_copy;
   tid_t tid;
   
@@ -45,8 +47,18 @@ process_execute (const char *cmdline)
 
   // printf("%s\n", "execute thread"); 
   /* Create a new thread to execute FILE_NAME. */
-  tid = thread_create (cmdline, PRI_DEFAULT+1, start_process, fn_copy);
+  char *file_name, *save_ptr;
+  file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
+
+  tid = thread_create (file_name, PRI_DEFAULT+1, start_process, fn_copy);
   
+  // wait until start process returns
+  int wait_load = 1;
+  while(wait_load){
+    wait_load = thread_current()->child_loading.value;
+    // printf("child still loading for thread - '%s' : %d\n", thread_current()->name, wait_load);
+  }
+
   // printf("%s\n", "created thread"); 
   if (tid == TID_ERROR){
     palloc_free_page (fn_copy);  
@@ -54,7 +66,7 @@ process_execute (const char *cmdline)
     
   }
   // start_process(fn_copy);
-  // printf("%s\n", "exiting process");
+  // printf("executed process : '%s'\n", cmdline);
   return tid;
 }
 
@@ -65,7 +77,7 @@ start_process (void *cmdline_)
 {
   // ASSERT(1==0); 
   char *cmdline = cmdline_;
-  printf("\nnew process : '%s'\n", (char *)cmdline);
+  // printf("\nstarting  process : '%s'\n", (char *)cmdline);
   struct intr_frame if_;
   bool success;
 
@@ -80,17 +92,23 @@ start_process (void *cmdline_)
   
 
   /* If load failed, quit. */
+  // printf("sema down for : '%s', from %d\n", thread_current()->parent->name, thread_current()->parent->child_loading.value);
+
+  bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
   
   if (!success){
     // printf("%s\n", "not successful");
+    palloc_free_page (cmdline);
+    thread_current()->exit_status = 1;
+    printf ("%s: exit(%d)\n", thread_current()->name, -1);
     thread_exit ();
     // printf("%s\n", "not at all successful");
   }else{
-    printf("\nnew process : '%s'\n", (char *)cmdline);
+    // printf("\nstarting  process : '%s'\n", (char *)cmdline);
     // printf("%s\n", "successful");
   }
-
   palloc_free_page (cmdline);
+
   /* Start the user process by simulating a return from an
      interrupt, implemented by intr_exit (in
      threads/intr-stubs.S).  Because intr_exit takes all of its
@@ -118,23 +136,35 @@ start_process (void *cmdline_)
 int
 process_wait (tid_t child_tid )// UNUSED 
 {
-  printf("running thread name : %s\t; and id : %d\n", thread_name(), thread_tid());
-  printf("child thread id : %d\n", child_tid);
+  // thread_listall();
+  // invalid tid;
+  if(!valid_tid(child_tid))return -1;
+  // if(!active_tid(child_tid))return -1;
+
+  // printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
+  // printf("child thread id : %d\n", child_tid);
   
   struct thread *current_thread = thread_current();
-  printf("process wait 1\n");
+  // printf("process wait 1\n");
   if(list_empty(&current_thread->child_procs))return -1;
-  printf("process wait 2\n");
+  // printf("process wait 2\n");
+  bool wait = true;
+
   struct list_elem *e;
 
-  for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
-    struct thread *ptr = list_entry (e, struct thread, child_proc);
-    // ...do something with f...
-    if(ptr->tid == child_tid){
-      process_wait(child_tid);
-      break;
+  while(wait){
+    for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
+      struct thread *ptr = list_entry (e, struct thread, child_proc);
+      
+      if(ptr->tid == child_tid){
+        if(ptr->exit_status == 1)return -1;
+      }else{
+        wait = false;
+        break;
+      }
     }
   }
+  
 
   
   return -1;
@@ -144,26 +174,27 @@ process_wait (tid_t child_tid )// UNUSED
 void
 process_exit (void)
 {
-  printf("exiting process\n");
+  // thread_listall();
+  // printf("exiting process\n");
   struct thread *cur = thread_current ();
-  printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
+  // printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
 
   int child_tid = thread_tid();
   
   struct thread *child_thread = thread_current();
-  printf("child thread to be exited: '%s'\n", child_thread->name);
+  // printf("child thread to be exited: '%s'\n", child_thread->name);
   struct thread *parent_thread = child_thread->parent;
   if(parent_thread){
-    printf("parent thread: '%s'\n", parent_thread->name);
+    // printf("parent thread: '%s'\n", parent_thread->name);
     int i;
     for (i = 0; i < parent_thread->num_child_procs; ++i)
     {
-      printf("child no. : %d\n", i);
+      // printf("child no. : %d\n", i);
       if(list_front(&parent_thread->child_procs) == &child_thread->child_proc){
-        printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
+        // printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
         list_pop_front(&parent_thread->child_procs);
         parent_thread->num_child_procs--;
-        printf("process removed from '%s'\n", parent_thread->name);
+        // printf("process removed from '%s'\n", parent_thread->name);
         break;
       }
       else{
@@ -172,6 +203,10 @@ process_exit (void)
     }
   }
   
+  if(cur->exit_status == 2){
+    cur->exit_status = 0;
+    // printf("changing exit status to zero\n");
+  }
   
 
   uint32_t *pd;
@@ -192,8 +227,11 @@ process_exit (void)
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }
-    printf("process exited\n");
+    // printf("process exited\n");
+    
 }
+
+
 
 /* Sets up the CPU for running user code in the current
    thread.
