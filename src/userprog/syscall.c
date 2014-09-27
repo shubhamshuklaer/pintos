@@ -12,7 +12,7 @@
   #include "lib/string.h"
   #include "filesys/file.h"
   #include "filesys/filesys.h"
-
+  #include <stdbool.h>
   bool validate_user(const uint8_t *uaddr, size_t size);
   
   /* Reads a byte at user virtual address UADDR.
@@ -63,8 +63,7 @@
   }
 
   static void syscall_handler (struct intr_frame *);
-  
-  
+
   void halt (struct intr_frame *f);
   void exit (struct intr_frame *f);
   void exec (struct intr_frame *f);
@@ -217,6 +216,7 @@
     return;
   }
 
+  
 
 
 
@@ -307,6 +307,7 @@
 
 
     power_off();
+
     return;
   }
 
@@ -324,10 +325,15 @@
     // printf("%s\n", "exit syscall !");
     
     // hex_dump
-    // printf("\n-----------------------------------\n");
-    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    // printf("\n-----------------------------------\n");
+    printf("stack pointer : %p\n", f->esp);
+    printf("return pointer : %p\n", f->eip);
+    
+    printf("\n-----------------------------------\n");
+    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    printf("\n-----------------------------------\n");
+    // hex_dump(f->eip, f->eip, PHYS_BASE - (void *)f->eip, 1);
 
+    
     int *ptr = f->esp;
     ptr ++;
 
@@ -381,8 +387,8 @@
     ptr ++;
 
     int pid = process_execute(cmd_line);
-    
-    
+
+
     // thread_exit();
     process_wait(pid);
     // process_exit();
@@ -447,14 +453,20 @@
 
     // retrieve file
     validate_user(ptr, 1);
-    const char *file = (char *)*ptr;
+    const char *file_name = (char *)*ptr;
     ptr ++;
     
     // retrieve initial_size 
     unsigned initial_size = *ptr;
     ptr ++;
-
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    if(filesys_create (file_name,initial_size)){
+       lock_release(&filesys_lock);
+       f->eax=true;
+    }else{ 
+        lock_release(&filesys_lock);
+        f->eax=false;
+    }
     return;  
   }
 
@@ -479,10 +491,16 @@
     
     // retrieve file
     validate_user(ptr, 1);
-    const char *file = (char *)*ptr;
-    ptr ++;
-    
-    thread_exit();
+    const char *file_name = (char *)*ptr;
+    ptr ++; 
+    lock_acquire(&filesys_lock);
+    if(filesys_remove (file_name)){
+        lock_release(&filesys_lock);
+        f->eax=true;
+    }else{ 
+        lock_release(&filesys_lock);
+        f->eax=false;
+    }
     return;
   }
 
@@ -507,10 +525,17 @@
     
     // retrieve file
     validate_user(ptr, 1);
-    const char *file = (char *)*ptr;
+    const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
-    
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file * file_ptr=filesys_open(file_name);
+    if(f!=NULL){
+       lock_release(&filesys_lock);
+       f->eax=process_add_file(file_ptr);
+    }else{
+       lock_release(&filesys_lock);
+       f->eax=-1;
+    } 
     return;
   }
 
@@ -536,8 +561,16 @@
     // retrieve fd
     int fd = *ptr;
     ptr ++;
-    
-    thread_exit();
+    int file_size; 
+    struct file *file_ptr;
+    lock_acquire(&filesys_lock);
+    file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+       f->eax=-1;
+    }else{
+       f->eax=file_length(file_ptr);//form filesys/file.h     
+    } 
+    lock_release(&filesys_lock);
     return;
   }
 
@@ -574,13 +607,24 @@
     unsigned size = *ptr;
     ptr ++;
 
-    char *buffer = malloc(size+1);
-    memcpy(buffer, buffer_ptr, size);
-
-    if(size && buffer_ptr){
-
+    if(fd==STDIN_FILENO){
+        int i;
+        uint8_t * casted_buffer=(uint8_t *)buffer_ptr;
+        for(i=0;i<size;i++){
+            casted_buffer[i]=input_getc();
+        }
+        f->eax=size;
+    }else{
+        lock_acquire(&filesys_lock);
+        struct file *file_ptr=process_get_file(fd);
+        if(file_ptr==NULL){
+            f->eax=-1;
+        }else{
+            int bytes=file_read(file_ptr,buffer_ptr,size);
+            f->eax=bytes;
+        }
+        lock_release(&filesys_lock);
     }
-    thread_exit();
     return;
   }
 
@@ -633,7 +677,7 @@
       memcpy(buffer, buffer_ptr, siz);
       
       // printf("size : %d\nfd : %d\n", size, fd);
- 
+
       // write to console if fd==1
       if(fd == 1){
         // printf("writing to console\n");
@@ -644,12 +688,22 @@
         }
         if(siz)putbuf(buffer, siz);
         f->eax = size;
-
+        return;
       }
       else if(fd == 0){
         //error - can't write to STDIN
+        f->eax=-1;
       }else{
-
+        lock_acquire(&filesys_lock);
+        struct file *file_ptr=process_get_file(fd);
+        if(file_ptr==NULL){
+            f->eax=-1;
+        }else{
+            int bytes=file_write(file_ptr,buffer_ptr,size);
+            f->eax=bytes;
+        }
+        lock_release(&filesys_lock);
+        
       }
     }else{
       f->eax = 0;
@@ -695,8 +749,16 @@
     unsigned position = *ptr;
     ptr ++;
     
-    
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file *file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+        f->eax=-1;
+    }else{
+        file_seek(file_ptr,position);
+        f->eax=position;
+    }
+    lock_release(&filesys_lock);
+
     return;
   }
 
@@ -724,7 +786,15 @@
     int fd = *ptr;
     ptr ++;
     
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file * file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+        f->eax=-1;
+    }else{
+        off_t offset=file_tell(file_ptr);
+        f->eax=offset;
+    }
+    lock_release(&filesys_lock);
     return;
   }
 
@@ -751,7 +821,10 @@
     validate_user(ptr, 1);
     int fd = *ptr;
     ptr ++;
+    lock_acquire(&filesys_lock);
+    f->eax=process_close_file(fd);
+    lock_release(&filesys_lock);
     
-    thread_exit();
+
     return;
   }
