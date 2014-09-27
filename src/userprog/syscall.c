@@ -552,13 +552,24 @@
     unsigned size = *ptr;
     ptr ++;
 
-    char *buffer = malloc(size+1);
-    memcpy(buffer, buffer_ptr, size);
-
-    if(size && buffer_ptr){
-
+    if(fd==STDIN_FILENO){
+        int i;
+        uint8_t * casted_buffer=(uint8_t *)buffer_ptr;
+        for(i=0;i<size;i++){
+            casted_buffer[i]=input_getc();
+        }
+        f->eax=size;
+    }else{
+        lock_acquire(&filesys_lock);
+        struct file *file_ptr=process_get_file(fd);
+        if(file_ptr==NULL){
+            f->eax=-1;
+        }else{
+            int bytes=file_read(file_ptr,buffer_ptr,size);
+            f->eax=bytes;
+        }
+        lock_release(&filesys_lock);
     }
-    thread_exit();
     return;
   }
 
@@ -619,14 +630,23 @@
         f->eax = size;
         return;
       }
-      else if(fd == 0){
+      else if(fd == 0){ 
         //error - can't write to STDIN
+        f->eax=-1;
       }else{
-
+        lock_acquire(&filesys_lock);
+        struct file *file_ptr=process_get_file(fd);
+        if(file_ptr==NULL){
+            f->eax=-1;
+        }else{
+            int bytes=file_write(file_ptr,buffer_ptr,size);
+            f->eax=bytes;
+        }
+        lock_release(&filesys_lock);
+        
       }
     }else{
       f->eax = 0;
-      return;
     }
 
 
@@ -665,8 +685,16 @@
     unsigned position = *ptr;
     ptr ++;
     
-    
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file *file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+        f->eax=-1;
+    }else{
+        file_seek(file_ptr,position);
+        f->eax=position;
+    }
+    lock_release(&filesys_lock);
+
     return;
   }
 
@@ -692,7 +720,15 @@
     int fd = *ptr;
     ptr ++;
     
-    thread_exit();
+    lock_acquire(&filesys_lock);
+    struct file * file_ptr=process_get_file(fd);
+    if(file_ptr==NULL){
+        f->eax=-1;
+    }else{
+        off_t offset=file_tell(file_ptr);
+        f->eax=offset;
+    }
+    lock_release(&filesys_lock);
     return;
   }
 
