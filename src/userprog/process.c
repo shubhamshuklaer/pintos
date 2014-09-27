@@ -670,7 +670,7 @@
   }
 
 
-  int process_add_file(struct file *file_ptr){
+int process_add_file(struct file * file_ptr){
     struct process_file *pf=(struct process_file *)malloc(sizeof(struct process_file));
     struct thread *t=thread_current();
     if(pf==NULL)
@@ -678,17 +678,16 @@
     pf->file=file_ptr;
     pf->fd=t->fd;
     t->fd++;
-    list_push_back(&(t->file_list),pf->elem);
+    list_push_back(&(t->file_list),&(pf->elem));
     return pf->fd;
 
-  }
+}
 
 struct file * process_get_file(int fd){
-    struct file * file_ptr;
-    struct list_elem e;
+    struct list_elem *e;
     struct thread *t=thread_current();
     struct process_file * pf;
-    for(e=list_begin(&t->file_list),e!=list_end(&t->file_list),e=list_next(e)){
+    for(e=list_begin(&t->file_list);e!=list_end(&t->file_list);e=list_next(e)){
         pf=list_entry(e,struct process_file,elem);
         if(pf->fd==fd)
             return pf->file;   
@@ -697,11 +696,10 @@ struct file * process_get_file(int fd){
 }
 
 int process_close_file(int fd){
-    struct file * file_ptr;
-    struct list_elem e;
+    struct list_elem *e;
     struct thread *t=thread_current();
     struct process_file * pf;
-    for(e=list_begin(&t->file_list),e!=list_end(&t->file_list),e=list_next(e)){
+    for(e=list_begin(&t->file_list);e!=list_end(&t->file_list);e=list_next(e)){
         pf=list_entry(e,struct process_file,elem);
         if(pf->fd==fd){
             file_close(pf->file);
