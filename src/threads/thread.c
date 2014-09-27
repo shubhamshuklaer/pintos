@@ -112,7 +112,7 @@
   void
   thread_init (void) 
   {
-    printf("thread init\n");
+    // printf("thread init\n");
     ASSERT (intr_get_level () == INTR_OFF);
     lock_init (&tid_lock);
     list_init (&all_list);
@@ -127,6 +127,10 @@
     // printf("thread init 4\n");
     initial_thread->tid = allocate_tid ();
     // printf("thread init exit\n");
+    
+    // printf("++ init sema for: '%s' to 0\n", initial_thread->name);
+    sema_init(&initial_thread->child_loading, 0);
+
   }
 
   /* Starts preemptive thread scheduling by enabling interrupts.
@@ -263,6 +267,14 @@
     t->num_child_procs = 0;
     t->exit_status = 2;
     parent_thread->num_child_procs++;
+    // printf("-- init sema for: '%s',to 0\n", name);
+    sema_init(&t->child_loading, 0);
+
+
+    if(name != "idle"){
+      // printf("-+ sema up for : '%s',from %d\n", t->parent->name, t->parent->child_loading.value);
+      sema_up(&t->parent->child_loading);
+    }
     // printf("thread create 1\n");
     if(&t->child_procs){
       // printf("child proc list not null\n");
@@ -360,6 +372,19 @@
   }
 
   bool
+  active_tid(tid_t tid){
+    struct list_elem *e;
+
+    for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
+      struct thread *ptr = list_entry (e, struct thread, allelem);
+      if(ptr->tid == tid){
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool
   thread_alive(tid_t tid){
     struct list_elem *e;
 
@@ -417,6 +442,7 @@
 
   #ifdef USERPROG
     process_exit ();
+
   #endif
     // printf("%s\n", "process exit");
     /* Remove thread from all threads list, set our status to dying,
@@ -610,6 +636,8 @@
     // initialize child processes
     // printf("init thread 1\n");  
     t->num_child_procs = 0;
+    
+
     // printf("init thread 2\n");
     // t->child_procs = malloc(sizeof(list));
     // printf("init thread 3\n");
