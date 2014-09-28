@@ -15,6 +15,7 @@
 
 
   bool validate_user(const uint8_t *uaddr, size_t size);
+  bool validate_kernel(const uint8_t *kaddr, size_t size);
   
   /* Reads a byte at user virtual address UADDR.
   UADDR must be below PHYS_BASE.
@@ -29,6 +30,24 @@
     asm ("movl $1f, %0; movzbl %1, %0; 1:"
     : "=&a" (result) : "m" (*uaddr));
     return result;
+  }
+
+  bool validate_kernel(const uint8_t *kaddr, size_t size){
+    // printf("address to be validated : %p\n", uaddr);
+    if(!kaddr){
+       // printf("\nvalidation failed 1\n");
+       exit_on_error();
+      return false;
+    }
+    void *ptr = kaddr;
+    if(!is_kernel_vaddr(kaddr)){
+      // printf("\nvalidation failed 2\n");
+      exit_on_error();
+      return false;
+    }
+    
+    // printf("\nvalidation passed\n");
+    return true;
   }
 
   bool validate_user(const uint8_t *uaddr, size_t size){
@@ -498,11 +517,11 @@
   */
   void remove (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "remove syscall !");
+    // printf("%s\n", "remove syscall !");
     int *ptr = f->esp;
     ptr ++;
     
@@ -532,11 +551,11 @@
   */
   void open (struct intr_frame *f){
     // hex_dump
-    // printf("\n-----------------------------------\n");
-    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    // printf("\n-----------------------------------\n");
+    printf("\n-----------------------------------\n");
+    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    printf("\n-----------------------------------\n");
 
-    // printf("%s\n", "open syscall !");
+    printf("%s\n", "open syscall !");
     int *ptr = f->esp;
     ptr ++;
     
@@ -544,8 +563,19 @@
     validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
+
+    if(!file_name){
+      exit_on_error();
+    }
+
+    validate_kernel(file_name, 1);
+    printf("file name: %s\n", file_name);
+
     lock_acquire(&filesys_lock);
     struct file * file_ptr=filesys_open(file_name);
+    if(!file_ptr){
+      exit_on_error();
+    }
     if(f!=NULL){
        lock_release(&filesys_lock);
        f->eax=process_add_file(file_ptr);
@@ -567,11 +597,11 @@
   */
   void filesize (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "filesize syscall !");
+    // printf("%s\n", "filesize syscall !");
 
     int *ptr = f->esp;
     ptr ++;
@@ -602,11 +632,11 @@
   */
   void read (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "read syscall !");
+    // printf("%s\n", "read syscall !");
     int *ptr = f->esp;
     ptr ++;
 
@@ -748,11 +778,11 @@
   */
   void seek (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "seek syscall !");
+    // printf("%s\n", "seek syscall !");
     int *ptr = f->esp;
     ptr ++;
 
@@ -790,11 +820,11 @@
   */
   void tell (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "tell syscall !");
+    // printf("%s\n", "tell syscall !");
     int *ptr = f->esp;
     ptr ++;
 
@@ -826,11 +856,11 @@
   */
   void close (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "close syscall !");
+    // printf("%s\n", "close syscall !");
     int *ptr = f->esp;
     ptr ++;
     
