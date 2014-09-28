@@ -162,7 +162,7 @@
       printf ("%s: exit(%d)\n", thread_current()->name, -1);
       thread_exit();
     }
-    lock_init(&filesys_lock);
+    
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
     

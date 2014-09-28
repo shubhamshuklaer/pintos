@@ -326,7 +326,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 bool
 load (const char *cmdline, void (**eip) (void), void **esp) 
 {
-  // printf("\nload entered : %s\n", cmdline);
+  // printf("load entered : %s\n", cmdline);
   struct thread *t = thread_current ();
   struct Elf32_Ehdr ehdr;
   struct file *file = NULL;
@@ -345,11 +345,20 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   char *cmdline_copy = malloc(strlen(cmdline)+1);
   strlcpy(cmdline_copy, cmdline, strlen(cmdline)+1);
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
-  // printf("%s\nname of file : \n%s\n", file_name, file_name);
+  // printf("name of file : %s\n", file_name);
+
+  if(!&filesys_lock){
+    // printf("no filesys lock yet\n");
+    lock_init(&filesys_lock);
+  }
+  lock_acquire(&filesys_lock);
+  // printf("filesys lock acquired\n");
   file = filesys_open (file_name);
+  lock_release(&filesys_lock);
+
   if (file == NULL) 
     {
-      printf ("load: %s: open failed\n", file_name);
+      printf ("load: %s; open failed\n", file_name);
       goto done; 
     }
 
