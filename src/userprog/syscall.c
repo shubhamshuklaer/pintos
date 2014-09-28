@@ -1,5 +1,3 @@
-  #include "userprog/syscall.h"
-  #include "userprog/process.h"
   #include <stdio.h>
   #include <syscall-nr.h>
   #include "threads/interrupt.h"
@@ -8,10 +6,14 @@
   #include "threads/vaddr.h"
   #include "threads/init.h"
   #include "threads/synch.h"
+  #include "userprog/syscall.h"
+  #include "userprog/process.h"
   #include "lib/string.h"
   #include "filesys/file.h"
   #include "filesys/filesys.h"
   #include <stdbool.h>
+
+
   bool validate_user(const uint8_t *uaddr, size_t size);
   
   /* Reads a byte at user virtual address UADDR.
@@ -141,6 +143,7 @@
       printf ("%s: exit(%d)\n", thread_current()->name, -1);
       thread_exit();
     }
+    lock_init(&filesys_lock);
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
     
@@ -186,8 +189,7 @@
         break;
       default:
         // printf ("unknown system call!\n");
-        printf ("%s: exit(%d)\n", thread_current()->name, -1);
-        thread_exit();
+        exit_on_error();
         break;
     }
 
@@ -324,12 +326,12 @@
     // printf("%s\n", "exit syscall !");
     
     // hex_dump
-    printf("stack pointer : %p\n", f->esp);
-    printf("return pointer : %p\n", f->eip);
+    // printf("stack pointer : %p\n", f->esp);
+    // printf("return pointer : %p\n", f->eip);
     
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
     // hex_dump(f->eip, f->eip, PHYS_BASE - (void *)f->eip, 1);
 
     
@@ -440,11 +442,11 @@
 
   */
   void create (struct intr_frame *f){
-    printf("%s\n", "create syscall !");
+    // printf("%s\n", "create syscall !");
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
     
     int *ptr = f->esp;
@@ -454,15 +456,31 @@
     validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
     ptr ++;
-    
+    // printf("create 2\n");
     // retrieve initial_size 
     unsigned initial_size = *ptr;
     ptr ++;
+    // printf("create name: %s\n", file_name);
+    // printf("create size: %d\n", initial_size);
+    
+    if(&filesys_lock){
+      // printf("there is lock\n");
+    }else{
+      // printf("no lock at all\n");
+    }
+
+    if(!file_name){
+      f->eax = false;
+      exit_on_error();
+    }
     lock_acquire(&filesys_lock);
+    // printf("create 3\n");
     if(filesys_create (file_name,initial_size)){
+      // printf("created\n");
        lock_release(&filesys_lock);
        f->eax=true;
     }else{ 
+      // printf("could not create\n");
         lock_release(&filesys_lock);
         f->eax=false;
     }
@@ -514,11 +532,11 @@
   */
   void open (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "open syscall !");
+    // printf("%s\n", "open syscall !");
     int *ptr = f->esp;
     ptr ++;
     
