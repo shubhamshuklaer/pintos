@@ -12,6 +12,11 @@
   #include "filesys/file.h"
   #include "filesys/filesys.h"
   #include <stdbool.h>
+  #include "devices/disk.h"
+  #include "userprog/pagedir.h"
+
+
+
 
 
   bool validate_user(const uint8_t *uaddr, size_t size);
@@ -77,10 +82,22 @@
     return true;
   }
 
+
   void exit_on_error(void){
     printf ("%s: exit(%d)\n", thread_current()->name, -1);
     thread_exit();
   }
+
+  
+void * user_to_kernel_ptr(const void *vaddr){
+  // TO DO: Need to check if all bytes within range are correct
+  // for strings + buffers
+  void * ptr=NULL;
+  if(validate_user(vaddr,1))
+    ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
+  return ptr;
+}
+
 
   static void syscall_handler (struct intr_frame *);
 
@@ -472,28 +489,40 @@
     ptr ++;
 
     // retrieve file
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     const char *file_name = (char *)*ptr;
     ptr ++;
     // printf("create 2\n");
     // retrieve initial_size 
     unsigned initial_size = *ptr;
     ptr ++;
-    // printf("create name: %s\n", file_name);
+    // printf("create name: %s\n", file_ptr);
     // printf("create size: %d\n", initial_size);
-    
-    if(&filesys_lock){
-      // printf("there is lock\n");
-    }else{
-      // printf("no lock at all\n");
+    // printf("file_ptr: %p \ndisksize: %p\n",file_ptr,(struct file *)(disk_size(filesys_disk)*DISK_SECTOR_SIZE));
+    // printf("disk size sector : %d \n disk sector size : %d\n",disk_size(filesys_disk),DISK_SECTOR_SIZE);
+    // if(file_ptr!=NULL){
+    //   if(file_ptr <(struct file *) (disk_size(filesys_disk)*DISK_SECTOR_SIZE)){
+    //     printf("pointer ok\n");
+    //   }
+    //   else{
+    //     printf("file_ptr: %p \ndisksize: %p\n",file_ptr,(struct file *)(disk_size(filesys_disk)*DISK_SECTOR_SIZE));
+    //     printf("disk overflow\n");
+    //     f->eax = false;
+    //     exit_on_error();
+    //   }
+    // }else{
+    //   printf("null file pointer\n");
+    //   f->eax = false;
+    //   exit_on_error();
+    // }
+    file_name=user_to_kernel_ptr(file_name);
+    if(!file_name){
+        f->eax = false;
+        exit_on_error();
     }
 
-    if(!file_name){
-      f->eax = false;
-      exit_on_error();
-    }
     
-    validate_kernel(file_name, 1);
     // printf("file name: %s\n", file_name);
 
     lock_acquire(&filesys_lock);
@@ -530,15 +559,18 @@
     ptr ++;
     
     // retrieve file
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
+    file_name=user_to_kernel_ptr(file_name);
 
     if(!file_name){
+      f->eax=false;
       exit_on_error();
     }
 
-    validate_kernel(file_name, 1);
+    
     // printf("file name: %s\n", file_name);
 
     lock_acquire(&filesys_lock);
@@ -562,7 +594,7 @@
 
   */
   void open (struct intr_frame *f){
-    // hex_dump
+    //hex_dump
     // printf("\n-----------------------------------\n");
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
@@ -572,23 +604,25 @@
     ptr ++;
     
     // retrieve file
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     const char *file_name = (char *)*ptr;
     ptr += sizeof(char *);
 
+    file_name=user_to_kernel_ptr(file_name);
     if(!file_name){
+      // printf("dfafdasf1");
+      f->eax=-1;
       exit_on_error();
     }
 
-    validate_kernel(file_name, 1);
+    // printf("file_name ptr %p\n%s\n",file_name,file_name);
     // printf("file name: %s\n", file_name);
 
     lock_acquire(&filesys_lock);
     struct file * file_ptr=filesys_open(file_name);
-    if(!file_ptr){
-      exit_on_error();
-    }
-    if(f!=NULL){
+
+    if(file_ptr!=NULL){
        lock_release(&filesys_lock);
        f->eax=process_add_file(file_ptr);
     }else{
@@ -618,6 +652,8 @@
     int *ptr = f->esp;
     ptr ++;
     // retrieve fd
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int fd = *ptr;
     ptr ++;
     int file_size; 
@@ -653,19 +689,34 @@
     ptr ++;
 
     // retrieve fd
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int fd = *ptr;
     ptr ++;
 
     // retrieve buffer
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     char *buffer_ptr = (char *)*ptr;
     ptr ++;
 
     //retrieve size
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     unsigned size = *ptr;
     ptr ++;
-
+    ///////////////////////////////////////////////////////////////////////
+    // validate user-provided buffer
+    if(!validate_user(buffer_ptr, size)){
+      // printf("user validation failed\n");
+      f->eax = 0;
+      return;
+    }else{
+      buffer_ptr=user_to_kernel_ptr(buffer_ptr);
+      if(!buffer_ptr)
+        exit_on_error();
+    }
+    /////////////////////////////////////////////////////////////////////
     if(fd==STDIN_FILENO){
         int i;
         uint8_t * casted_buffer=(uint8_t *)buffer_ptr;
@@ -673,6 +724,8 @@
             casted_buffer[i]=input_getc();
         }
         f->eax=size;
+    }else if(fd==STDOUT_FILENO){
+        f->eax=-1;//can't write to stdout
     }else{
         lock_acquire(&filesys_lock);
         struct file *file_ptr=process_get_file(fd);
@@ -707,18 +760,22 @@
     ptr ++;
     // printf ("ptr : %p\n", ptr);
     // retrieve fd
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int fd = *ptr;
     ptr ++;
     // printf ("ptr : %p\n", ptr);
 
     // retrieve buffer
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     char *buffer_ptr = (char *)*ptr;
     
     ptr ++;
     // printf ("ptr : %p\n", ptr);
     //retrieve size
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     unsigned size = *ptr;
     ptr ++;
 
@@ -728,7 +785,9 @@
       f->eax = 0;
       return;
     }else{
-      // printf("user validation passeddd\n");
+      buffer_ptr=user_to_kernel_ptr(buffer_ptr);
+      if(!buffer_ptr)
+        exit_on_error();
     }
     unsigned siz = size;
     if(siz){
@@ -799,12 +858,14 @@
     ptr ++;
 
     // retrieve fd
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+          exit_on_error();
     int fd = *ptr;
     ptr ++;
 
     // retrieve position 
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+          exit_on_error();
     unsigned position = *ptr;
     ptr ++;
     
@@ -841,7 +902,8 @@
     ptr ++;
 
     // retrieve fd
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int fd = *ptr;
     ptr ++;
     
@@ -877,7 +939,8 @@
     ptr ++;
     
     // retrieve fd
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int fd = *ptr;
     ptr ++;
     lock_acquire(&filesys_lock);
