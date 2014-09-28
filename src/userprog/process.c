@@ -63,6 +63,11 @@ process_execute (const char *cmdline)
         s= list_entry (e, struct thread, child_proc);
         if(s->tid == tid){
           sema_down(&s->me_loading);
+          if(s->exit_status==1){
+            return TID_ERROR;
+          }
+          // printf("after sema down");
+          // thread_listall();
           break;          
         }
     }    
@@ -99,23 +104,23 @@ start_process (void *cmdline_)
     if(thread_current()->parent!=NULL)
       thread_current()->parent->child_loaded_success =  true;
     sema_up(&thread_current()->me_loading);
-  }
-  // printf("sema down for : '%s', from %d\n", thread_current()->parent->name, thread_current()->parent->child_loading.value);
-
-  // bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
-  
-  if (!success){
+    if(intr_get_level()==INTR_ON){
+      thread_yield();
+    }
+  }else{
     // printf("%s\n", "not successful");
     palloc_free_page (cmdline);
     thread_current()->exit_status = 1;
     printf ("%s: exit(%d)\n", thread_current()->name, -1);
+    sema_up(&thread_current()->me_loading);
+    if(intr_get_level()==INTR_ON){
+      thread_yield();
+    } 
     thread_exit ();
     // printf("%s\n", "not at all successful");
-  }else{
-    // printf("\nstarting  process : '%s'\n", (char *)cmdline);
-    // printf("%s\n", "successful");
-    
   }
+  
+ 
   palloc_free_page (cmdline);
 
   /* Start the user process by simulating a return from an
