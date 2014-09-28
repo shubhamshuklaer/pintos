@@ -34,7 +34,7 @@ tid_t
 process_execute (const char *cmdline) 
 {
   // thread_listall();
-  printf("process to be executed: '%s'\n", cmdline);
+  // printf("process to be executed: '%s'\n", cmdline);
   char *fn_copy;
   tid_t tid;
   
@@ -52,22 +52,22 @@ process_execute (const char *cmdline)
 
   tid = thread_create (file_name, PRI_DEFAULT+1, start_process, fn_copy);
   
-  // wait until start process returns
-  int wait_load = 1;
-  while(wait_load){
-    wait_load = thread_current()->child_loading.value;
-    printf("child still loading for thread - '%s' : %d\n", thread_current()->name, wait_load);
-  }
-
   // printf("%s\n", "created thread"); 
   if (tid == TID_ERROR){
     palloc_free_page (fn_copy);  
   }else{
-    
+    struct thread *cur,*s;
+    struct list_elem *e;
+      cur= thread_current();
+      for (e = list_begin (&cur->child_procs); e != list_end (&cur->child_procs);e = list_next (e)){
+        s= list_entry (e, struct thread, child_proc);
+        if(s->tid == tid){
+          sema_down(&s->me_loading);
+          break;          
+        }
+    }    
   }
-  if(thread_current()->child_loaded_success==false){
-    return TID_ERROR;
-  }
+
   // start_process(fn_copy);
   // printf("executed process : '%s'\n", cmdline);
   return tid;
@@ -96,11 +96,13 @@ start_process (void *cmdline_)
 
   /* If load failed, quit. */
   if(success){
-    thread_current()->parent->child_loaded_success =  true;
+    if(thread_current()->parent!=NULL)
+      thread_current()->parent->child_loaded_success =  true;
+    sema_up(&thread_current()->me_loading);
   }
   // printf("sema down for : '%s', from %d\n", thread_current()->parent->name, thread_current()->parent->child_loading.value);
 
-  bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
+  // bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
   
   if (!success){
     // printf("%s\n", "not successful");
@@ -110,7 +112,7 @@ start_process (void *cmdline_)
     thread_exit ();
     // printf("%s\n", "not at all successful");
   }else{
-    printf("\nstarting  process : '%s'\n", (char *)cmdline);
+    // printf("\nstarting  process : '%s'\n", (char *)cmdline);
     // printf("%s\n", "successful");
     
   }
@@ -148,37 +150,51 @@ process_wait (tid_t child_tid )// UNUSED
   if(!valid_tid(child_tid))return -1;
   // if(!active_tid(child_tid))return -1;
 
-  printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
-  printf("child thread id : %d\n", child_tid);
+  // printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
+  // printf("child thread id : %d\n", child_tid);
   
   struct thread *current_thread = thread_current();
   // printf("process wait 1\n");
   if(list_empty(&current_thread->child_procs))return -1;
   // printf("process wait 2\n");
-  bool wait = true;
+  // bool wait = true;
 
+  // struct list_elem *e;
+
+  // while(wait){
+  //   wait = false;
+  //   for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
+  //     struct thread *ptr = list_entry (e, struct thread, child_proc);
+  //     printf("thread ptr: %p",ptr);
+  //     printf("pid: %d\tcid: %d\n", ptr->tid, child_tid);
+  //     if(ptr->tid == child_tid){
+  //       wait = true;
+  //       ptr->signal_parent_on_exit=true;
+  //       // child terminated by kernel
+  //       if(ptr->exit_status == 1)return -1;        
+  //     }
+  //   }
+  // }
+
+  ////////////////////////////////////////////////////////////////////////////////
   struct list_elem *e;
-
-  while(wait){
-    wait = false;
-    for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
-      struct thread *ptr = list_entry (e, struct thread, child_proc);
-
-      printf("pid: %d\tcid: %d\n", ptr->tid, child_tid);
-      if(ptr->tid == child_tid){
-        wait = true;
-        // child terminated by kernel
-        if(ptr->exit_status == 1)return -1;
-        else return ptr->exit_status;
-      }else{
-        
-      }
+  struct thread *s;
+  for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
+    s= list_entry (e, struct thread, child_proc);
+    if(s->tid == child_tid){
+      s->signal_parent_on_exit=true;
+      sema_down(&s->parent_wait);
+      break;
     }
   }
-  
-
-  
-  return -1;
+  ////////////////////////////////////////////////////////////////////////////////
+  // printf("shubham %d\n",current_thread->child_exit_status);
+  if(current_thread->child_exit_status==1){
+    return -1;
+  }
+  else{
+    return current_thread->child_exit_status;
+  }
 }
 
 /* Free the current process's resources. */
@@ -187,54 +203,67 @@ process_exit (void)
 {
   // thread_listall();
   // printf("exiting process\n");
-  struct thread *cur = thread_current ();
-  printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
+  // printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
 
   int child_tid = thread_tid();
   
   struct thread *child_thread = thread_current();
-  printf("child thread to be exited: '%s'\n", child_thread->name);
+  // printf("child thread to be exited: '%s'\n", child_thread->name);
   struct thread *parent_thread = child_thread->parent;
-  if(parent_thread){
+
+  if(child_thread->exit_status == 2){
+    child_thread->exit_status = 0;
+    // printf("changing exit status to zero\n");
+  }
+
+  if(parent_thread!=NULL&&child_thread->signal_parent_on_exit){
+    parent_thread->child_exit_status=child_thread->exit_status;
+    sema_up(&child_thread->parent_wait);
+  }
+  list_remove(&child_thread->child_proc);
+  if(parent_thread!=NULL){
     // printf("parent thread: '%s'\n", parent_thread->name);
-    int i;
-    for (i = 0; i < parent_thread->num_child_procs; ++i)
-    {
-      printf("child no. : %d\n", i);
-      if(list_front(&parent_thread->child_procs) == &child_thread->child_proc){
-        printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
-        list_pop_front(&parent_thread->child_procs);
-        parent_thread->num_child_procs--;
-        printf("process removed from '%s'\n", parent_thread->name);
-        break;
-      }
-      else{
-        list_push_back(&parent_thread->child_procs, list_pop_front(&parent_thread->child_procs));
-      }
-    }
+    // int i;
+    // for (i = 0; i < parent_thread->num_child_procs; ++i)
+    // {
+    //   printf("child no. : %d\n", i);
+    //   if(list_front(&parent_thread->child_procs) == &child_thread->child_proc){
+    //     printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
+    //     list_pop_front(&parent_thread->child_procs);
+    //     parent_thread->num_child_procs--;
+    //     printf("process removed from '%s'\n", parent_thread->name);
+    //     break;
+    //   }
+    //   else{
+    //     list_push_back(&parent_thread->child_procs, list_pop_front(&parent_thread->child_procs));
+    //   }
+    // }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////
+    
+    parent_thread->num_child_procs--;
+    ////////////////////////////////////////////////////////////////////////////////////
+
   }
   
-  if(cur->exit_status == 2){
-    cur->exit_status = 0;
-    printf("changing exit status to zero\n");
-  }
+  
   
 
   uint32_t *pd;
 
   /* Destroy the current process's page directory and switch back
      to the kernel-only page directory. */
-  pd = cur->pagedir;
+  pd = child_thread->pagedir;
   if (pd != NULL) 
     {
       /* Correct ordering here is crucial.  We must set
-         cur->pagedir to NULL before switching page directories,
+         child_thread->pagedir to NULL before switching page directories,
          so that a timer interrupt can't switch back to the
          process page directory.  We must activate the base page
          directory before destroying the process's page
          directory, or our active page directory will be one
          that's been freed (and cleared). */
-      cur->pagedir = NULL;
+      child_thread->pagedir = NULL;
       pagedir_activate (NULL);
       pagedir_destroy (pd);
     }

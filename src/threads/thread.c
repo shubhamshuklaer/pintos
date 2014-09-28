@@ -129,7 +129,6 @@
     // printf("thread init exit\n");
     
     // printf("++ init sema for: '%s' to 0\n", initial_thread->name);
-    sema_init(&initial_thread->child_loading, 0);
 
   }
 
@@ -259,6 +258,8 @@
 
     intr_set_level (old_level);
 
+
+#ifdef USERPROG
     /* Set this to be a child thread of current thread */
     int parent_tid = thread_tid();
     // printf("setting child parameters for current process(tid) : %d\n", parent_tid);
@@ -268,12 +269,11 @@
     t->exit_status = 2;
     parent_thread->num_child_procs++;
     // printf("-- init sema for: '%s',to 0\n", name);
-    sema_init(&t->child_loading, 0);
+    sema_init(&t->me_loading, 1);
 
-
-    if(name != "idle" && name != "main"){
+    if(is_thread(t->parent)){
       // printf("-+ sema up for : '%s',from %d\n", t->parent->name, t->parent->child_loading.value);
-      sema_up(&t->parent->child_loading);
+      sema_down(&t->me_loading);
       t->parent->child_loaded_success = false;
     }
     // printf("thread create 1\n");
@@ -288,7 +288,9 @@
 
     list_push_back(&parent_thread->child_procs, &t->child_proc);
     // printf("thread create 4\n");
-
+    t->signal_parent_on_exit=false;
+    sema_init(&t->parent_wait, 0);
+#endif
     /* Add to run queue. */
     thread_unblock (t);
 
@@ -354,7 +356,7 @@
 
     for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
       struct thread *ptr = list_entry (e, struct thread, allelem);
-      // printf("Thread pointer : %p\n",ptr);
+      printf("Thread pointer : %p and tid : %d\n",ptr,ptr->tid);
       // printf("\n-----------------------------------\n");
       // printf("thread name; %s\n", ptr->name);
       // printf("thread exit status: %d\n", ptr->exit_status);

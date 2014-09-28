@@ -431,13 +431,12 @@ void * user_to_kernel_ptr(const void *vaddr){
       return;
     }
     int pid = process_execute(cmd_line);
-
     // printf("pid: %d\n",pid);
     // thread_exit();
-    process_wait(pid);
+    
     // process_exit();
     f->eax = pid;
-
+    thread_listall();
     return;
   }
 
@@ -451,11 +450,11 @@ void * user_to_kernel_ptr(const void *vaddr){
 
   */
   void wait (struct intr_frame *f){
-    // printf("%s\n", "wait syscall !");
+    printf("%s\n", "wait syscall !");
     // hex_dump
-    // printf("\n-----------------------------------\n");
-    // hex_dump(f->2esp, f->esp, PHYS_BASE - f->esp, 1);
-    // printf("\n-----------------------------------\n");
+    printf("\n-----------------------------------\n");
+    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    printf("\n-----------------------------------\n");
 
     
     int *ptr = f->esp;
@@ -466,14 +465,17 @@ void * user_to_kernel_ptr(const void *vaddr){
       exit_on_error();
     int pid = *ptr;
     ptr ++;
-    // printf("checking for thread alive\n");
-    if(!thread_alive(pid))return -1;
-
-    // printf("thread alive\n");
+    printf("checking for thread alive\n %d",pid);
+    thread_listall();
+    if(!thread_alive(pid)){
+      printf("thread not alive");
+      return -1;
+    }
+    printf("thread alive\n");
     int wait_status = process_wait(pid);
-    // printf("wait status: %d\n", wait_status);
+    printf("wait status: %d\n", wait_status);
     f->eax = wait_status;
-    // printf("done waiting\n");
+    printf("done waiting\n");
     // thread_exit();
     return;
   }

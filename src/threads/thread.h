@@ -118,8 +118,11 @@ struct thread
     struct list child_procs;
     struct list_elem child_proc;
     int exit_status;
+    bool signal_parent_on_exit;
+    int child_exit_status;
     bool child_loaded_success; 
-    struct semaphore child_loading;
+    struct semaphore me_loading;
+    struct semaphore parent_wait;
     
 #endif
 
