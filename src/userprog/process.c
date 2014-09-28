@@ -34,7 +34,7 @@ tid_t
 process_execute (const char *cmdline) 
 {
   // thread_listall();
-  // printf("process to be executed: '%s'\n", cmdline);
+  printf("process to be executed: '%s'\n", cmdline);
   char *fn_copy;
   tid_t tid;
   
@@ -56,7 +56,7 @@ process_execute (const char *cmdline)
   int wait_load = 1;
   while(wait_load){
     wait_load = thread_current()->child_loading.value;
-    // printf("child still loading for thread - '%s' : %d\n", thread_current()->name, wait_load);
+    printf("child still loading for thread - '%s' : %d\n", thread_current()->name, wait_load);
   }
 
   // printf("%s\n", "created thread"); 
@@ -64,6 +64,9 @@ process_execute (const char *cmdline)
     palloc_free_page (fn_copy);  
   }else{
     
+  }
+  if(thread_current()->child_loaded_success==false){
+    return TID_ERROR;
   }
   // start_process(fn_copy);
   // printf("executed process : '%s'\n", cmdline);
@@ -92,6 +95,9 @@ start_process (void *cmdline_)
   
 
   /* If load failed, quit. */
+  if(success){
+    thread_current()->parent->child_loaded_success =  true;
+  }
   // printf("sema down for : '%s', from %d\n", thread_current()->parent->name, thread_current()->parent->child_loading.value);
 
   bool child_loading_empty = sema_try_down(&thread_current()->parent->child_loading);
@@ -104,7 +110,7 @@ start_process (void *cmdline_)
     thread_exit ();
     // printf("%s\n", "not at all successful");
   }else{
-    // printf("\nstarting  process : '%s'\n", (char *)cmdline);
+    printf("\nstarting  process : '%s'\n", (char *)cmdline);
     // printf("%s\n", "successful");
     
   }
@@ -142,8 +148,8 @@ process_wait (tid_t child_tid )// UNUSED
   if(!valid_tid(child_tid))return -1;
   // if(!active_tid(child_tid))return -1;
 
-  // printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
-  // printf("child thread id : %d\n", child_tid);
+  printf("running thread name : '%s'\t; and id : %d\n", thread_name(), thread_tid());
+  printf("child thread id : %d\n", child_tid);
   
   struct thread *current_thread = thread_current();
   // printf("process wait 1\n");
@@ -154,14 +160,18 @@ process_wait (tid_t child_tid )// UNUSED
   struct list_elem *e;
 
   while(wait){
+    wait = false;
     for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
       struct thread *ptr = list_entry (e, struct thread, child_proc);
-      
+
+      printf("pid: %d\tcid: %d\n", ptr->tid, child_tid);
       if(ptr->tid == child_tid){
+        wait = true;
+        // child terminated by kernel
         if(ptr->exit_status == 1)return -1;
+        else return ptr->exit_status;
       }else{
-        wait = false;
-        break;
+        
       }
     }
   }
@@ -178,24 +188,24 @@ process_exit (void)
   // thread_listall();
   // printf("exiting process\n");
   struct thread *cur = thread_current ();
-  // printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
+  printf("exiting process with name : '%s'\tid: %d\n", thread_current ()->name, thread_current ()->tid);
 
   int child_tid = thread_tid();
   
   struct thread *child_thread = thread_current();
-  // printf("child thread to be exited: '%s'\n", child_thread->name);
+  printf("child thread to be exited: '%s'\n", child_thread->name);
   struct thread *parent_thread = child_thread->parent;
   if(parent_thread){
     // printf("parent thread: '%s'\n", parent_thread->name);
     int i;
     for (i = 0; i < parent_thread->num_child_procs; ++i)
     {
-      // printf("child no. : %d\n", i);
+      printf("child no. : %d\n", i);
       if(list_front(&parent_thread->child_procs) == &child_thread->child_proc){
-        // printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
+        printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
         list_pop_front(&parent_thread->child_procs);
         parent_thread->num_child_procs--;
-        // printf("process removed from '%s'\n", parent_thread->name);
+        printf("process removed from '%s'\n", parent_thread->name);
         break;
       }
       else{
@@ -206,7 +216,7 @@ process_exit (void)
   
   if(cur->exit_status == 2){
     cur->exit_status = 0;
-    // printf("changing exit status to zero\n");
+    printf("changing exit status to zero\n");
   }
   
 
@@ -358,7 +368,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
   if (file == NULL) 
     {
-      printf ("load: %s; open failed\n", file_name);
+      printf ("load: %s: open failed\n", file_name);
       goto done; 
     }
 
@@ -371,7 +381,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
       || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
       || ehdr.e_phnum > 1024) 
     {
-      printf ("load: %s: error loading executable\n", file_name);
+      // printf ("load: %s: error loading executable\n", file_name);
       goto done; 
     }
 

@@ -271,9 +271,10 @@
     sema_init(&t->child_loading, 0);
 
 
-    if(name != "idle"){
+    if(name != "idle" && name != "main"){
       // printf("-+ sema up for : '%s',from %d\n", t->parent->name, t->parent->child_loading.value);
       sema_up(&t->parent->child_loading);
+      t->parent->child_loaded_success = false;
     }
     // printf("thread create 1\n");
     if(&t->child_procs){
@@ -286,7 +287,6 @@
     // printf("thread create 3\n");
 
     list_push_back(&parent_thread->child_procs, &t->child_proc);
-    list_push_back (&all_list, &t->allelem);
     // printf("thread create 4\n");
 
     /* Add to run queue. */
@@ -354,6 +354,7 @@
 
     for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
       struct thread *ptr = list_entry (e, struct thread, allelem);
+      // printf("Thread pointer : %p\n",ptr);
       // printf("\n-----------------------------------\n");
       // printf("thread name; %s\n", ptr->name);
       // printf("thread exit status: %d\n", ptr->exit_status);
@@ -387,14 +388,15 @@
   bool
   thread_alive(tid_t tid){
     struct list_elem *e;
-
+    // printf("hello1");
     for (e = list_begin (&all_list); e != list_end (&all_list);e = list_next (e)){
       struct thread *ptr = list_entry (e, struct thread, allelem);
+      // printf("all_list ptrs : %p\n",ptr);
       if(ptr->tid == tid){
         return true;
-        break;
       }
     }
+    // printf("hello2");
     return false;
   }
 
@@ -450,7 +452,8 @@
        when it call schedule_tail(). */
     intr_disable ();
     list_remove (&thread_current()->allelem);
-    // printf("%s\n", "ok");
+    // thread_listall();
+    // printf("%p %s\n",thread_current() ,"removed from all_list");
     thread_current ()->status = THREAD_DYING;
     schedule ();
     NOT_REACHED ();

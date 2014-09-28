@@ -176,7 +176,7 @@ void * user_to_kernel_ptr(const void *vaddr){
     int ptr = get_user(f->esp);
     // 
     if(!validate_user((uint8_t *)ptr, 1)){
-      printf ("%s: exit(%d)\n", thread_current()->name, -1);
+      // printf ("%s: exit(%d)\n", thread_current()->name, -1);
       thread_exit();
     }
     
@@ -419,13 +419,20 @@ void * user_to_kernel_ptr(const void *vaddr){
     ptr ++;
 
     // retrieve file
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     const char *cmd_line = (char *)*ptr;
     ptr ++;
 
+
+    cmd_line=user_to_kernel_ptr(cmd_line);
+    if(!cmd_line){
+      f->eax=-1;
+      return;
+    }
     int pid = process_execute(cmd_line);
 
-
+    // printf("pid: %d\n",pid);
     // thread_exit();
     process_wait(pid);
     // process_exit();
@@ -447,7 +454,7 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("%s\n", "wait syscall !");
     // hex_dump
     // printf("\n-----------------------------------\n");
-    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // hex_dump(f->2esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
     
@@ -455,14 +462,17 @@ void * user_to_kernel_ptr(const void *vaddr){
     ptr ++;
 
     // retrieve pid
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     int pid = *ptr;
     ptr ++;
-    
+    // printf("checking for thread alive\n");
     if(!thread_alive(pid))return -1;
 
+    // printf("thread alive\n");
     int wait_status = process_wait(pid);
-    if(wait_status == -1)f->eax = wait_status;
+    // printf("wait status: %d\n", wait_status);
+    f->eax = wait_status;
     // printf("done waiting\n");
     // thread_exit();
     return;
