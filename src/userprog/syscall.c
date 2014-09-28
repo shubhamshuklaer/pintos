@@ -492,6 +492,10 @@
       f->eax = false;
       exit_on_error();
     }
+    
+    validate_kernel(file_name, 1);
+    // printf("file name: %s\n", file_name);
+
     lock_acquire(&filesys_lock);
     // printf("create 3\n");
     if(filesys_create (file_name,initial_size)){
@@ -528,7 +532,15 @@
     // retrieve file
     validate_user(ptr, 1);
     const char *file_name = (char *)*ptr;
-    ptr ++; 
+    ptr += sizeof(char *);
+
+    if(!file_name){
+      exit_on_error();
+    }
+
+    validate_kernel(file_name, 1);
+    // printf("file name: %s\n", file_name);
+
     lock_acquire(&filesys_lock);
     if(filesys_remove (file_name)){
         lock_release(&filesys_lock);
@@ -551,11 +563,11 @@
   */
   void open (struct intr_frame *f){
     // hex_dump
-    printf("\n-----------------------------------\n");
-    hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
-    printf("\n-----------------------------------\n");
+    // printf("\n-----------------------------------\n");
+    // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
+    // printf("\n-----------------------------------\n");
 
-    printf("%s\n", "open syscall !");
+    // printf("%s\n", "open syscall !");
     int *ptr = f->esp;
     ptr ++;
     
@@ -569,7 +581,7 @@
     }
 
     validate_kernel(file_name, 1);
-    printf("file name: %s\n", file_name);
+    // printf("file name: %s\n", file_name);
 
     lock_acquire(&filesys_lock);
     struct file * file_ptr=filesys_open(file_name);
