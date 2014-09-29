@@ -173,17 +173,18 @@ void * user_to_kernel_ptr(const void *vaddr){
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
-    int ptr = get_user(f->esp);
+    int * ptr = user_to_kernel_ptr(f->esp);
     // 
-    if(!validate_user((uint8_t *)ptr, 1)){
-      // printf ("%s: exit(%d)\n", thread_current()->name, -1);
-      thread_exit();
+    if(!ptr){
+      thread_current()->exit_status=-1;
+      exit_on_error();    
     }
+
     
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
     
-    switch(ptr){
+    switch(*ptr){
       case SYS_HALT:
         halt(f);
         break;
@@ -374,7 +375,8 @@ void * user_to_kernel_ptr(const void *vaddr){
     int *ptr = f->esp;
     ptr ++;
 
-    validate_user(ptr, 1);
+    if(!validate_user(ptr, 1))
+      exit_on_error();
     // retrieve status
     // printf("stack pointer : %p\n", ptr);
     int status = *ptr;
