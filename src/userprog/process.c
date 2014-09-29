@@ -198,6 +198,7 @@ process_wait (tid_t child_tid )// UNUSED
     return -1;
   }
   else{
+    // printf("child exit status %d",current_thread->child_exit_status);
     return current_thread->child_exit_status;
   }
 }
