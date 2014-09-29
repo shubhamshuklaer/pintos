@@ -1,0 +1,35 @@
+FAIL tests/userprog/wait-killed
+FAIL tests/userprog/multi-recurse
+run: wait(exec("multi-recurse")) returned -1: FAILED
+FAIL tests/userprog/rox-simple
+run: try to write "rox-simple": FAILED
+FAIL tests/userprog/rox-child
+run: try to write "child-rox": FAILED
+FAIL tests/userprog/rox-multichild
+run: try to write "child-rox": FAILED
+FAIL tests/userprog/bad-read
+FAIL tests/userprog/bad-write
+FAIL tests/userprog/bad-read2
+FAIL tests/userprog/bad-write2
+FAIL tests/userprog/bad-jump
+FAIL tests/userprog/bad-jump2
+FAIL tests/userprog/no-vm/multi-oom
+run: crashed child should return -1.: FAILED
+FAIL tests/filesys/base/syn-read
+run: wait for child 1 of 10 returned -1 (expected 0): FAILED
+FAIL tests/filesys/base/syn-write
+run: wait for child 1 of 10 returned -1 (expected 0): FAILED
+FAIL tests/userprog/wait-killed
+FAIL tests/userprog/multi-recurse
+FAIL tests/userprog/rox-simple
+FAIL tests/userprog/rox-child
+FAIL tests/userprog/rox-multichild
+FAIL tests/userprog/bad-read
+FAIL tests/userprog/bad-write
+FAIL tests/userprog/bad-read2
+FAIL tests/userprog/bad-write2
+FAIL tests/userprog/bad-jump
+FAIL tests/userprog/bad-jump2
+FAIL tests/userprog/no-vm/multi-oom
+FAIL tests/filesys/base/syn-read
+FAIL tests/filesys/base/syn-write
