@@ -63,7 +63,7 @@ process_execute (const char *cmdline)
         s= list_entry (e, struct thread, child_proc);
         if(s->tid == tid){
           sema_down(&s->me_loading);
-          if(s->exit_status==1){
+          if(s->exit_status==-1){
             return TID_ERROR;
           }
           // printf("after sema down");
