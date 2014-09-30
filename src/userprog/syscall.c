@@ -57,25 +57,30 @@
 
   bool validate_user(const uint8_t *uaddr, size_t size){
     // printf("address to be validated : %p\n", uaddr);
+    bool valid = true;
     if(!uaddr){
        // printf("\nvalidation failed 1\n");
-       exit_on_error();
+       //  thread_current()->exit_status=-1;
+       // exit_on_error();
       return false;
     }
     void *ptr = uaddr;
     if(!is_user_vaddr(uaddr)){
       // printf("\nvalidation failed 2\n");
-      exit_on_error();
+      // thread_current()->exit_status=-1;
+      // exit_on_error();
       return false;
     }
     if(!is_user_vaddr(uaddr + size - 1)){
       // printf("\nvalidation failed 3\n");
-      exit_on_error();
+      // thread_current()->exit_status=-1;
+      // exit_on_error();
       return false;
     }
     if((uint8_t *)0x08048000 > uaddr  && 0x20 < uaddr){
       // printf("\nvalidation failed 4\n");
-      exit_on_error();
+      // thread_current()->exit_status=-1;
+      // exit_on_error();
       return false;
     }
     // printf("\nvalidation passed\n");
@@ -434,7 +439,7 @@ void * user_to_kernel_ptr(const void *vaddr){
     }
     int pid = process_execute(cmd_line);
     // thread_exit();
-    
+    // printf("sh %d\n",pid);
     // process_exit();
     f->eax = pid;
     // thread_listall();
@@ -626,7 +631,7 @@ void * user_to_kernel_ptr(const void *vaddr){
     file_name=user_to_kernel_ptr(file_name);
     if(!file_name){
       // printf("dfafdasf1");
-      f->eax=-1;
+      thread_current()->exit_status=-1;
       exit_on_error();
     }
 
@@ -703,32 +708,46 @@ void * user_to_kernel_ptr(const void *vaddr){
     ptr ++;
 
     // retrieve fd
-    if(!validate_user(ptr, 1))
+    if(!validate_user(ptr, 1)){
+      thread_current()->exit_status=-1;
       exit_on_error();
+    }
     int fd = *ptr;
     ptr ++;
 
     // retrieve buffer
-    if(!validate_user(ptr, 1))
+    if(!validate_user(ptr, 1)){
+      thread_current()->exit_status=-1;
       exit_on_error();
+    }
     char *buffer_ptr = (char *)*ptr;
     ptr ++;
 
     //retrieve size
-    if(!validate_user(ptr, 1))
+    if(!validate_user(ptr, 1)){
+      thread_current()->exit_status=-1;
       exit_on_error();
+    }
     unsigned size = *ptr;
     ptr ++;
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
+    // buffer_ptr=user_to_kernel_ptr(buffer_ptr);
+
+
+
     if(!validate_user(buffer_ptr, size)){
       // printf("user validation failed\n");
-      f->eax = 0;
+      thread_current()->exit_status=-1;
+      exit_on_error();
       return;
     }else{
       buffer_ptr=user_to_kernel_ptr(buffer_ptr);
-      if(!buffer_ptr)
+      if(!buffer_ptr){
+        thread_current()->exit_status=-1;
         exit_on_error();
+      }
+        
     }
     /////////////////////////////////////////////////////////////////////
     if(fd==STDIN_FILENO){
