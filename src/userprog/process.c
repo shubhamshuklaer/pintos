@@ -63,7 +63,7 @@ process_execute (const char *cmdline)
         s= list_entry (e, struct thread, child_proc);
         if(s->tid == tid){
           sema_down(&s->me_loading);
-          if(s->exit_status==1){
+          if(s->exit_status==-1){
             return TID_ERROR;
           }
           // printf("after sema down");
@@ -110,7 +110,7 @@ start_process (void *cmdline_)
   }else{
     // printf("%s\n", "not successful");
     palloc_free_page (cmdline);
-    thread_current()->exit_status = 1;
+    thread_current()->exit_status = -1;
     printf ("%s: exit(%d)\n", thread_current()->name, -1);
     sema_up(&thread_current()->me_loading);
     if(intr_get_level()==INTR_ON){
@@ -194,7 +194,8 @@ process_wait (tid_t child_tid )// UNUSED
   }
   ////////////////////////////////////////////////////////////////////////////////
   // printf("shubham %d\n",current_thread->child_exit_status);
-  if(current_thread->child_exit_status==1){
+  if(current_thread->child_exit_status==-1){
+    // printf("gg\n");
     return -1;
   }
   else{
@@ -217,10 +218,10 @@ process_exit (void)
   // printf("child thread to be exited: '%s'\n", child_thread->name);
   struct thread *parent_thread = child_thread->parent;
 
-  if(child_thread->exit_status == 2){
-    child_thread->exit_status = 0;
-    // printf("changing exit status to zero\n");
-  }
+  // if(child_thread->exit_status == 2){
+  //   child_thread->exit_status = 0;
+  //   // printf("changing exit status to zero\n");
+  // }
 
   if(parent_thread!=NULL&&child_thread->signal_parent_on_exit){
     parent_thread->child_exit_status=child_thread->exit_status;

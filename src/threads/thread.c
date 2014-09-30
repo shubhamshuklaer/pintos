@@ -266,7 +266,7 @@
     struct thread *parent_thread = thread_current();
     t->parent = parent_thread;
     t->num_child_procs = 0;
-    t->exit_status = 2;
+    // t->exit_status = 2;
     parent_thread->num_child_procs++;
     // printf("-- init sema for: '%s',to 0\n", name);
     sema_init(&t->me_loading, 1);
