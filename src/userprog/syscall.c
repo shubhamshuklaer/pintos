@@ -384,7 +384,7 @@ void * user_to_kernel_ptr(const void *vaddr){
 
     // printf("exiting with status : %d\n", status);
     f->eax = status;
-
+    // printf("yoohoo %d",status);
     // process termination message
     printf ("%s: exit(%d)\n", thread_current()->name, status);
     thread_current()->exit_status = status;
