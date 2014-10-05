@@ -259,39 +259,7 @@
     intr_set_level (old_level);
 
 
-#ifdef USERPROG
-    /* Set this to be a child thread of current thread */
-    int parent_tid = thread_tid();
-    // printf("setting child parameters for current process(tid) : %d\n", parent_tid);
-    struct thread *parent_thread = thread_current();
-    t->parent = parent_thread;
-    t->num_child_procs = 0;
-    // t->exit_status = 2;
-    parent_thread->num_child_procs++;
-    // printf("-- init sema for: '%s',to 0\n", name);
-    sema_init(&t->me_loading, 1);
-
-    if(is_thread(t->parent)){
-      // printf("-+ sema up for : '%s',from %d\n", t->parent->name, t->parent->child_loading.value);
-      sema_down(&t->me_loading);
-      t->parent->child_loaded_success = false;
-    }
-    // printf("thread create 1\n");
-    if(&t->child_procs){
-      // printf("child proc list not null\n");
-    }else{
-      // printf("child proc list null\n");
-    }
-    // printf("thread create 2\n");
-    list_init(&t->child_procs);
-    // printf("thread create 3\n");
-
-    list_push_back(&parent_thread->child_procs, &t->child_proc);
-    // printf("thread create 4\n");
-    t->signal_parent_on_exit=false;
-    sema_init(&t->parent_wait, 0);
-#endif
-    /* Add to run queue. */
+   /* Add to run queue. */
     thread_unblock (t);
 
     return tid;
@@ -640,13 +608,11 @@
 
     // initialize child processes
     // printf("init thread 1\n");  
-    t->num_child_procs = 0;
     
 
     // printf("init thread 2\n");
     // t->child_procs = malloc(sizeof(list));
     // printf("init thread 3\n");
-    list_init(&(t->child_procs));
     // printf("init thread 4\n");
     t->parent = NULL;
     // printf("init thread 5\n");
@@ -654,6 +620,21 @@
     //For file handling
     list_init(&(t->file_list));
     t->fd=2;
+#ifdef USERPROG
+    if(running_thread()->status==THREAD_RUNNING){
+        t->parent = thread_current();
+        t->parent->num_child_procs++;
+        list_push_back(&(t->parent->child_procs), &t->child_proc);
+        t->parent->child_loaded_success = false;
+    }
+    sema_init(&(t->me_loading), 1);
+    sema_down(&(t->me_loading));
+    list_init(&(t->child_procs));
+    t->signal_parent_on_exit=false;
+    sema_init(&(t->parent_wait), 0);
+    t->num_child_procs = 0;
+#endif
+ 
   }
 
   /* Allocates a SIZE-byte frame at the top of thread T's stack and

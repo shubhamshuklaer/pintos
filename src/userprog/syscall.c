@@ -14,40 +14,80 @@
   #include <stdbool.h>
   #include "devices/disk.h"
   #include "userprog/pagedir.h"
+  #include "filesys/directory.h"
 
+/* Reads a byte at user virtual address UADDR.
+UADDR must be below PHYS_BASE.
+Returns the byte value if successful, -1 if a segfault
+occurred. */
+static int
+get_user (const uint8_t *uaddr)
+{
+    if(!is_user_vaddr(uaddr))
+       exit_on_error(); 
+    int result;
+    asm ("movl $1f, %0; movzbl %1, %0; 1:"
+        : "=&a" (result) : "m" (*uaddr));
+    return result;
+}
+/* Writes BYTE to user address UDST.
+UDST must be below PHYS_BASE.
+Returns true if successful, false if a segfault occurred. */
+static bool
+put_user (uint8_t *udst, uint8_t byte)
+{
+    if(!is_user_vaddr(udst))
+       exit_on_error(); 
+    int error_code;
+    asm ("movl $1f, %0; movb %b2, %1; 1:"
+        : "=&a" (error_code), "=m" (*udst) : "r" (byte));
+    return error_code != -1;
+}
 
+//get four bytes from user memory
+//x86 uses little endian format
+//i.e lsb is on the lowest memeoy address
+//uaddr will be lsb
+//x86 int and void * are 4 bytes
+static int
+get_four_bytes_user(const void* user_addr){
+    uint8_t *uaddr=(uint8_t *)user_addr;
+    int temp,i,j=0,result=0;
+    for(i=0;i<4;i++){
+        temp=get_user(uaddr);
+        if(temp==-1)
+            exit_on_error();
+        result+=(temp<<j);
+        j+=8;
+    }    
+    return result;
+}
 
+bool
+validate_string(const char * str){
+    int val=-1,i,temp;
+    for(i=0;val!=0;i++){
+        val=get_user(str+i);
+        if(val==-1)
+            return false;
+    }
+    return true;
+}
 
 
   bool validate_user(const uint8_t *uaddr, size_t size);
   bool validate_kernel(const uint8_t *kaddr, size_t size);
   
-  /* Reads a byte at user virtual address UADDR.
-  UADDR must be below PHYS_BASE.
-  Returns the byte value if successful, -1 if a segfault
-  occurred. */
-  static int
-  get_user (const uint8_t *uaddr)
-  {
-    validate_user(uaddr, 1);
-    // printf("getting from user address : %p\n", uaddr);
-    int result;
-    asm ("movl $1f, %0; movzbl %1, %0; 1:"
-    : "=&a" (result) : "m" (*uaddr));
-    return result;
-  }
 
   bool validate_kernel(const uint8_t *kaddr, size_t size){
     // printf("address to be validated : %p\n", uaddr);
     if(!kaddr){
        // printf("\nvalidation failed 1\n");
-       exit_on_error();
       return false;
     }
     void *ptr = kaddr;
     if(!is_kernel_vaddr(kaddr)){
       // printf("\nvalidation failed 2\n");
-      exit_on_error();
       return false;
     }
     
@@ -60,27 +100,19 @@
     bool valid = true;
     if(!uaddr){
        // printf("\nvalidation failed 1\n");
-       //  thread_current()->exit_status=-1;
-       // exit_on_error();
       return false;
     }
     void *ptr = uaddr;
     if(!is_user_vaddr(uaddr)){
       // printf("\nvalidation failed 2\n");
-      // thread_current()->exit_status=-1;
-      // exit_on_error();
       return false;
     }
     if(!is_user_vaddr(uaddr + size - 1)){
       // printf("\nvalidation failed 3\n");
-      // thread_current()->exit_status=-1;
-      // exit_on_error();
       return false;
     }
     if((uint8_t *)0x08048000 > uaddr  && 0x20 < uaddr){
       // printf("\nvalidation failed 4\n");
-      // thread_current()->exit_status=-1;
-      // exit_on_error();
       return false;
     }
     // printf("\nvalidation passed\n");
@@ -90,18 +122,10 @@
 
   void exit_on_error(void){
     printf ("%s: exit(%d)\n", thread_current()->name, -1);
+    thread_current()->exit_status=-1;
     thread_exit();
   }
 
-  
-void * user_to_kernel_ptr(const void *vaddr){
-  // TO DO: Need to check if all bytes within range are correct
-  // for strings + buffers
-  void * ptr=NULL;
-  if(validate_user(vaddr,1))
-    ptr = pagedir_get_page(thread_current()->pagedir, vaddr);
-  return ptr;
-}
 
 
   static void syscall_handler (struct intr_frame *);
@@ -178,18 +202,11 @@ void * user_to_kernel_ptr(const void *vaddr){
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
-    int * ptr = user_to_kernel_ptr(f->esp);
-    // 
-    if(!ptr){
-      thread_current()->exit_status=-1;
-      exit_on_error();    
-    }
-
-    
+    int sys_call_num=get_four_bytes_user(f->esp); 
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
-    
-    switch(*ptr){
+    f->esp++;//So that we don't have to do it in each syscall 
+    switch(sys_call_num){
       case SYS_HALT:
         halt(f);
         break;
@@ -343,14 +360,7 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
-
-    
-    int *ptr = f->esp;
-    ptr ++;
-
-
     power_off();
-
     return;
   }
 
@@ -376,24 +386,15 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
     // hex_dump(f->eip, f->eip, PHYS_BASE - (void *)f->eip, 1);
 
-    
-    int *ptr = f->esp;
-    ptr ++;
-
-    if(!validate_user(ptr, 1))
-      exit_on_error();
     // retrieve status
     // printf("stack pointer : %p\n", ptr);
-    int status = *ptr;
-    ptr ++;
-
+    int status =get_four_bytes_user(f->esp);
+    f->esp++;
     // printf("exiting with status : %d\n", status);
     f->eax = status;
-    // printf("yoohoo %d",status);
     // process termination message
     printf ("%s: exit(%d)\n", thread_current()->name, status);
     thread_current()->exit_status = status;
-    
     thread_exit ();
     // printf("%s\n", "exit syscall finished!");
     return;
@@ -411,7 +412,6 @@ void * user_to_kernel_ptr(const void *vaddr){
 
   void exec (struct intr_frame *f){
     // printf("%s\n", "exec syscall !");
-
     // printf("stack pointer : %p\n", f->esp);
     // printf("return pointer : %p\n", f->eip);
 
@@ -421,21 +421,12 @@ void * user_to_kernel_ptr(const void *vaddr){
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
-    
-    int *ptr = f->esp;
-    ptr ++;
-
     // retrieve file
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    const char *cmd_line = (char *)*ptr;
-    ptr ++;
-
-
-    cmd_line=user_to_kernel_ptr(cmd_line);
-    if(!cmd_line){
-      f->eax=-1;
-      return;
+    const char *cmd_line = (char *)get_four_bytes_user(f->esp);
+    f->esp++;
+    if(!validate_string(cmd_line)){
+        f->eax=-1;
+        return;
     }
     int pid = process_execute(cmd_line);
     // thread_exit();
@@ -461,16 +452,10 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
-
     
-    int *ptr = f->esp;
-    ptr ++;
-
     // retrieve pid
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    int pid = *ptr;
-    ptr ++;
+    int pid =get_four_bytes_user(f->esp);
+    f->esp++;
     // printf("checking for thread alive\n %d",pid);
     // thread_listall();
     if(!thread_alive(pid)){
@@ -503,19 +488,13 @@ void * user_to_kernel_ptr(const void *vaddr){
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
-    
-    int *ptr = f->esp;
-    ptr ++;
-
     // retrieve file
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    const char *file_name = (char *)*ptr;
-    ptr ++;
+    const char *file_name = (char *)get_four_bytes_user(f->esp);
+    f->esp++;
     // printf("create 2\n");
     // retrieve initial_size 
-    unsigned initial_size = *ptr;
-    ptr ++;
+    unsigned initial_size = get_four_bytes_user(f->esp);
+    f->esp++;
     // printf("create name: %s\n", file_ptr);
     // printf("create size: %d\n", initial_size);
     // printf("file_ptr: %p \ndisksize: %p\n",file_ptr,(struct file *)(disk_size(filesys_disk)*DISK_SECTOR_SIZE));
@@ -535,11 +514,21 @@ void * user_to_kernel_ptr(const void *vaddr){
     //   f->eax = false;
     //   exit_on_error();
     // }
-    file_name=user_to_kernel_ptr(file_name);
-    if(!file_name){
+    if(!validate_string(file_name)){
         f->eax = false;
-        exit_on_error();
+        return;
     }
+    ////////////////////////////////////////////////////////
+    //Check for file name lenght
+    int i,val=-1;
+    for(i=0;val!=0;i++){
+        val=get_user(file_name+i);//string already verified        
+    }
+    if(i>=NAME_MAX){
+        f->eax=false;
+        return;
+    }
+    ///////////////////////////////////////////////////////
 
     
     // printf("file name: %s\n", file_name);
@@ -574,21 +563,13 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "remove syscall !");
-    int *ptr = f->esp;
-    ptr ++;
-    
     // retrieve file
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    const char *file_name = (char *)*ptr;
-    ptr += sizeof(char *);
-    file_name=user_to_kernel_ptr(file_name);
-
-    if(!file_name){
-      f->eax=false;
-      exit_on_error();
+    const char *file_name = (char *)get_four_bytes_user(f->esp);
+    f->esp++;
+    if(!validate_string(file_name)){
+        f->eax = false;
+        return;
     }
-
     
     // printf("file name: %s\n", file_name);
 
@@ -619,22 +600,14 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "open syscall !");
-    int *ptr = f->esp;
-    ptr ++;
-    
     // retrieve file
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    const char *file_name = (char *)*ptr;
-    ptr += sizeof(char *);
-
-    file_name=user_to_kernel_ptr(file_name);
-    if(!file_name){
-      // printf("dfafdasf1");
-      thread_current()->exit_status=-1;
-      exit_on_error();
+    const char *file_name = (char *)get_four_bytes_user(f->esp);
+    f->esp++;
+    if(!validate_string(file_name)){
+        f->eax = -1;
+        return;
     }
-
+    
     // printf("file_name ptr %p\n%s\n",file_name,file_name);
     // printf("file name: %s\n", file_name);
 
@@ -668,13 +641,9 @@ void * user_to_kernel_ptr(const void *vaddr){
 
     // printf("%s\n", "filesize syscall !");
 
-    int *ptr = f->esp;
-    ptr ++;
     // retrieve fd
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    int fd = *ptr;
-    ptr ++;
+    int fd =get_four_bytes_user(f->esp);
+    f->esp++;
     int file_size; 
     struct file *file_ptr;
     lock_acquire(&filesys_lock);
@@ -689,7 +658,6 @@ void * user_to_kernel_ptr(const void *vaddr){
   }
 
   /*
-
   int
   read (int fd, void *buffer, unsigned size)
   {
@@ -704,50 +672,23 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "read syscall !");
-    int *ptr = f->esp;
-    ptr ++;
-
     // retrieve fd
-    if(!validate_user(ptr, 1)){
-      thread_current()->exit_status=-1;
-      exit_on_error();
-    }
-    int fd = *ptr;
-    ptr ++;
+    int fd =get_four_bytes_user(f->esp);
+    f->esp++;
 
     // retrieve buffer
-    if(!validate_user(ptr, 1)){
-      thread_current()->exit_status=-1;
-      exit_on_error();
-    }
-    char *buffer_ptr = (char *)*ptr;
-    ptr ++;
+    char *buffer_ptr = (char *)get_four_bytes_user(f->esp);
+    f->esp ++;
 
     //retrieve size
-    if(!validate_user(ptr, 1)){
-      thread_current()->exit_status=-1;
-      exit_on_error();
-    }
-    unsigned size = *ptr;
-    ptr ++;
+    unsigned size = get_four_bytes_user(f->esp);
+    f->esp++;
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
-    // buffer_ptr=user_to_kernel_ptr(buffer_ptr);
-
-
-
-    if(!validate_user(buffer_ptr, size)){
+    if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
       // printf("user validation failed\n");
-      thread_current()->exit_status=-1;
       exit_on_error();
       return;
-    }else{
-      buffer_ptr=user_to_kernel_ptr(buffer_ptr);
-      if(!buffer_ptr){
-        thread_current()->exit_status=-1;
-        exit_on_error();
-      }
-        
     }
     /////////////////////////////////////////////////////////////////////
     if(fd==STDIN_FILENO){
@@ -789,39 +730,25 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("\n%s\n", "write syscall !");
-    int *ptr = f->esp;
-    ptr ++;
-    // printf ("ptr : %p\n", ptr);
     // retrieve fd
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    int fd = *ptr;
-    ptr ++;
-    // printf ("ptr : %p\n", ptr);
+    int fd =get_four_bytes_user(f->esp);
+    f->esp++;
 
     // retrieve buffer
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    char *buffer_ptr = (char *)*ptr;
-    
-    ptr ++;
-    // printf ("ptr : %p\n", ptr);
-    //retrieve size
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    unsigned size = *ptr;
-    ptr ++;
+    char *buffer_ptr = (char *)get_four_bytes_user(f->esp);
+    f->esp ++;
 
+    //retrieve size
+    unsigned size = get_four_bytes_user(f->esp);
+    f->esp++;
+    ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
-    if(!validate_user(buffer_ptr, size)){
+    if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
       // printf("user validation failed\n");
-      f->eax = 0;
+      exit_on_error();
       return;
-    }else{
-      buffer_ptr=user_to_kernel_ptr(buffer_ptr);
-      if(!buffer_ptr)
-        exit_on_error();
     }
+    /////////////////////////////////////////////////////////////////////
     unsigned siz = size;
     if(siz){
       char *buffer = malloc(siz+1);
@@ -887,20 +814,14 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "seek syscall !");
-    int *ptr = f->esp;
-    ptr ++;
 
     // retrieve fd
-    if(!validate_user(ptr, 1))
-          exit_on_error();
-    int fd = *ptr;
-    ptr ++;
+    int fd =get_four_bytes_user(f->esp);
+    f->esp++;
 
     // retrieve position 
-    if(!validate_user(ptr, 1))
-          exit_on_error();
-    unsigned position = *ptr;
-    ptr ++;
+    unsigned position =get_four_bytes_user(f->esp);
+    f->esp++;
     
     lock_acquire(&filesys_lock);
     struct file *file_ptr=process_get_file(fd);
@@ -931,14 +852,9 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "tell syscall !");
-    int *ptr = f->esp;
-    ptr ++;
-
     // retrieve fd
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    int fd = *ptr;
-    ptr ++;
+    int fd = get_four_bytes_user(f->esp);
+    f->esp++;
     
     lock_acquire(&filesys_lock);
     struct file * file_ptr=process_get_file(fd);
@@ -968,18 +884,12 @@ void * user_to_kernel_ptr(const void *vaddr){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "close syscall !");
-    int *ptr = f->esp;
-    ptr ++;
     
     // retrieve fd
-    if(!validate_user(ptr, 1))
-      exit_on_error();
-    int fd = *ptr;
-    ptr ++;
+    int fd =get_four_bytes_user(f->esp);
+    f->esp++;
     lock_acquire(&filesys_lock);
     f->eax=process_close_file(fd);
     lock_release(&filesys_lock);
-    
-
     return;
   }
