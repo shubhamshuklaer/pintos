@@ -149,9 +149,13 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
+
+
   if(!user){
-    f->eip=f->eax;
-    f->eax=-1;
+     //printf("Kernel page fault!\n");
+     f->eip = f->eax;
+     f->eax = 0xffffffff;
+     return;
   }
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

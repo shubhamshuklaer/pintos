@@ -54,7 +54,7 @@ get_four_bytes_user(const void* user_addr){
     uint8_t *uaddr=(uint8_t *)user_addr;
     int temp,i,j=0,result=0;
     for(i=0;i<4;i++){
-        temp=get_user(uaddr);
+        temp=get_user(uaddr+i);
         if(temp==-1)
             exit_on_error();
         result+=(temp<<j);
@@ -65,11 +65,13 @@ get_four_bytes_user(const void* user_addr){
 
 bool
 validate_string(const char * str){
+    if(str==NULL)
+        exit_on_error();
     int val=-1,i,temp;
     for(i=0;val!=0;i++){
         val=get_user(str+i);
         if(val==-1)
-            return false;
+            exit_on_error();
     }
     return true;
 }
@@ -205,7 +207,6 @@ validate_string(const char * str){
     int sys_call_num=get_four_bytes_user(f->esp); 
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
-    f->esp++;//So that we don't have to do it in each syscall 
     switch(sys_call_num){
       case SYS_HALT:
         halt(f);
@@ -388,8 +389,7 @@ validate_string(const char * str){
 
     // retrieve status
     // printf("stack pointer : %p\n", ptr);
-    int status =get_four_bytes_user(f->esp);
-    f->esp++;
+    int status =get_four_bytes_user(f->esp+4);
     // printf("exiting with status : %d\n", status);
     f->eax = status;
     // process termination message
@@ -422,12 +422,8 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
 
     // retrieve file
-    const char *cmd_line = (char *)get_four_bytes_user(f->esp);
-    f->esp++;
-    if(!validate_string(cmd_line)){
-        f->eax=-1;
-        return;
-    }
+    const char *cmd_line = (char *)get_four_bytes_user(f->esp+4);
+    validate_string(cmd_line);
     int pid = process_execute(cmd_line);
     // thread_exit();
     // printf("sh %d\n",pid);
@@ -454,8 +450,7 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
     
     // retrieve pid
-    int pid =get_four_bytes_user(f->esp);
-    f->esp++;
+    int pid =get_four_bytes_user(f->esp+4);
     // printf("checking for thread alive\n %d",pid);
     // thread_listall();
     if(!thread_alive(pid)){
@@ -489,12 +484,10 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
 
     // retrieve file
-    const char *file_name = (char *)get_four_bytes_user(f->esp);
-    f->esp++;
+    const char *file_name = (char *)get_four_bytes_user(f->esp+4);
     // printf("create 2\n");
     // retrieve initial_size 
-    unsigned initial_size = get_four_bytes_user(f->esp);
-    f->esp++;
+    unsigned initial_size = get_four_bytes_user(f->esp+8);
     // printf("create name: %s\n", file_ptr);
     // printf("create size: %d\n", initial_size);
     // printf("file_ptr: %p \ndisksize: %p\n",file_ptr,(struct file *)(disk_size(filesys_disk)*DISK_SECTOR_SIZE));
@@ -514,10 +507,7 @@ validate_string(const char * str){
     //   f->eax = false;
     //   exit_on_error();
     // }
-    if(!validate_string(file_name)){
-        f->eax = false;
-        return;
-    }
+    validate_string(file_name);
     ////////////////////////////////////////////////////////
     //Check for file name lenght
     int i,val=-1;
@@ -564,12 +554,8 @@ validate_string(const char * str){
 
     // printf("%s\n", "remove syscall !");
     // retrieve file
-    const char *file_name = (char *)get_four_bytes_user(f->esp);
-    f->esp++;
-    if(!validate_string(file_name)){
-        f->eax = false;
-        return;
-    }
+    const char *file_name = (char *)get_four_bytes_user(f->esp+4);
+    validate_string(file_name);
     
     // printf("file name: %s\n", file_name);
 
@@ -601,12 +587,8 @@ validate_string(const char * str){
 
     // printf("%s\n", "open syscall !");
     // retrieve file
-    const char *file_name = (char *)get_four_bytes_user(f->esp);
-    f->esp++;
-    if(!validate_string(file_name)){
-        f->eax = -1;
-        return;
-    }
+    const char *file_name = (char *)get_four_bytes_user(f->esp+4);
+    validate_string(file_name);
     
     // printf("file_name ptr %p\n%s\n",file_name,file_name);
     // printf("file name: %s\n", file_name);
@@ -642,8 +624,7 @@ validate_string(const char * str){
     // printf("%s\n", "filesize syscall !");
 
     // retrieve fd
-    int fd =get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd =get_four_bytes_user(f->esp+4);
     int file_size; 
     struct file *file_ptr;
     lock_acquire(&filesys_lock);
@@ -673,16 +654,13 @@ validate_string(const char * str){
 
     // printf("%s\n", "read syscall !");
     // retrieve fd
-    int fd =get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd =get_four_bytes_user(f->esp+4);
 
     // retrieve buffer
-    char *buffer_ptr = (char *)get_four_bytes_user(f->esp);
-    f->esp ++;
+    char *buffer_ptr = (char *)get_four_bytes_user(f->esp+8);
 
     //retrieve size
-    unsigned size = get_four_bytes_user(f->esp);
-    f->esp++;
+    unsigned size = get_four_bytes_user(f->esp+12);
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
     if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
@@ -731,16 +709,13 @@ validate_string(const char * str){
 
     // printf("\n%s\n", "write syscall !");
     // retrieve fd
-    int fd =get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd =get_four_bytes_user(f->esp+4);
 
     // retrieve buffer
-    char *buffer_ptr = (char *)get_four_bytes_user(f->esp);
-    f->esp ++;
+    char *buffer_ptr = (char *)get_four_bytes_user(f->esp+8);
 
     //retrieve size
-    unsigned size = get_four_bytes_user(f->esp);
-    f->esp++;
+    unsigned size = get_four_bytes_user(f->esp+12);
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
     if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
@@ -751,20 +726,16 @@ validate_string(const char * str){
     /////////////////////////////////////////////////////////////////////
     unsigned siz = size;
     if(siz){
-      char *buffer = malloc(siz+1);
-      memcpy(buffer, buffer_ptr, siz);
-      
       // printf("size : %d\nfd : %d\n", size, fd);
-
       // write to console if fd==1
       if(fd == 1){
         // printf("writing to console\n");
         while(siz > 100){
-          putbuf (buffer, 100);
-          buffer += 100;
+          putbuf (buffer_ptr, 100);
+          buffer_ptr += 100;
           siz -= 100;
         }
-        if(siz)putbuf(buffer, siz);
+        if(siz)putbuf(buffer_ptr, siz);
         f->eax = size;
         return;
       }
@@ -816,12 +787,10 @@ validate_string(const char * str){
     // printf("%s\n", "seek syscall !");
 
     // retrieve fd
-    int fd =get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd =get_four_bytes_user(f->esp+4);
 
     // retrieve position 
-    unsigned position =get_four_bytes_user(f->esp);
-    f->esp++;
+    unsigned position =get_four_bytes_user(f->esp+8);
     
     lock_acquire(&filesys_lock);
     struct file *file_ptr=process_get_file(fd);
@@ -853,8 +822,7 @@ validate_string(const char * str){
 
     // printf("%s\n", "tell syscall !");
     // retrieve fd
-    int fd = get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd = get_four_bytes_user(f->esp+4);
     
     lock_acquire(&filesys_lock);
     struct file * file_ptr=process_get_file(fd);
@@ -886,8 +854,7 @@ validate_string(const char * str){
     // printf("%s\n", "close syscall !");
     
     // retrieve fd
-    int fd =get_four_bytes_user(f->esp);
-    f->esp++;
+    int fd =get_four_bytes_user(f->esp+4);
     lock_acquire(&filesys_lock);
     f->eax=process_close_file(fd);
     lock_release(&filesys_lock);

@@ -35,7 +35,7 @@ process_execute (const char *cmdline)
 {
   // thread_listall();
   // printf("process to be executed: '%s'\n", cmdline);
-  char *fn_copy;
+  char *fn_copy,*fn_copy_1;
   tid_t tid;
   
   /* Make a copy of FILE_NAME.
@@ -44,17 +44,24 @@ process_execute (const char *cmdline)
   if (fn_copy == NULL)
     return TID_ERROR;
   strlcpy (fn_copy, cmdline, PGSIZE);
-
-  // printf("%s\n", "execute thread"); 
+  ///////////////////////////////////////////////////
+  fn_copy_1 = palloc_get_page (0);
+  if (fn_copy_1 == NULL)
+    return TID_ERROR;
+  strlcpy (fn_copy_1, cmdline, PGSIZE);
+  ////////////////////////////////////////////////////
   /* Create a new thread to execute FILE_NAME. */
   char *file_name, *save_ptr;
-  file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
+  file_name = strtok_r ((char *)fn_copy_1, " ,;", &save_ptr);
+  //strtok_r edits the fn_copy
+  //we didn't use cmdline as it caused access right voilation
 
   tid = thread_create (file_name, PRI_DEFAULT+1, start_process, fn_copy);
   
   // printf("%s\n", "created thread"); 
   if (tid == TID_ERROR){
     palloc_free_page (fn_copy);  
+    palloc_free_page (fn_copy_1);  
   }else{
     struct thread *cur,*s;
     struct list_elem *e;
@@ -73,6 +80,8 @@ process_execute (const char *cmdline)
     }    
   }
 
+    //palloc_free_page (fn_copy);  
+    //palloc_free_page (fn_copy_1);  
   // start_process(fn_copy);
   // printf("executed process : '%s'\n", cmdline);
   return tid;
@@ -162,26 +171,6 @@ process_wait (tid_t child_tid )// UNUSED
   // printf("process wait 1\n");
   if(list_empty(&current_thread->child_procs))return -1;
   // printf("process wait 2\n");
-  // bool wait = true;
-
-  // struct list_elem *e;
-
-  // while(wait){
-  //   wait = false;
-  //   for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
-  //     struct thread *ptr = list_entry (e, struct thread, child_proc);
-  //     printf("thread ptr: %p",ptr);
-  //     printf("pid: %d\tcid: %d\n", ptr->tid, child_tid);
-  //     if(ptr->tid == child_tid){
-  //       wait = true;
-  //       ptr->signal_parent_on_exit=true;
-  //       // child terminated by kernel
-  //       if(ptr->exit_status == 1)return -1;        
-  //     }
-  //   }
-  // }
-
-  ////////////////////////////////////////////////////////////////////////////////
   struct list_elem *e;
   struct thread *s;
   for (e = list_begin (&current_thread->child_procs); e != list_end (&current_thread->child_procs);e = list_next (e)){
@@ -218,39 +207,13 @@ process_exit (void)
   // printf("child thread to be exited: '%s'\n", child_thread->name);
   struct thread *parent_thread = child_thread->parent;
 
-  // if(child_thread->exit_status == 2){
-  //   child_thread->exit_status = 0;
-  //   // printf("changing exit status to zero\n");
-  // }
-
   if(parent_thread!=NULL&&child_thread->signal_parent_on_exit){
     parent_thread->child_exit_status=child_thread->exit_status;
     sema_up(&child_thread->parent_wait);
   }
   list_remove(&child_thread->child_proc);
   if(parent_thread!=NULL){
-    // printf("parent thread: '%s'\n", parent_thread->name);
-    // int i;
-    // for (i = 0; i < parent_thread->num_child_procs; ++i)
-    // {
-    //   printf("child no. : %d\n", i);
-    //   if(list_front(&parent_thread->child_procs) == &child_thread->child_proc){
-    //     printf("removing process with tid: %d\t, from child_list of tid: %d\n", child_thread->tid, parent_thread->tid);
-    //     list_pop_front(&parent_thread->child_procs);
-    //     parent_thread->num_child_procs--;
-    //     printf("process removed from '%s'\n", parent_thread->name);
-    //     break;
-    //   }
-    //   else{
-    //     list_push_back(&parent_thread->child_procs, list_pop_front(&parent_thread->child_procs));
-    //   }
-    // }
-
-    ////////////////////////////////////////////////////////////////////////////////////////////////
-    
     parent_thread->num_child_procs--;
-    ////////////////////////////////////////////////////////////////////////////////////
-
   }
   
   
