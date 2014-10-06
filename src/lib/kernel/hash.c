@@ -9,8 +9,6 @@
 #include "../debug.h"
 #include "threads/malloc.h"
 
-#define list_elem_to_hash_elem(LIST_ELEM)                       \
-        list_entry(LIST_ELEM, struct hash_elem, list_elem)
 
 static struct list *find_bucket (struct hash *, struct hash_elem *);
 static struct hash_elem *find_elem (struct hash *, struct list *,
@@ -428,3 +426,7 @@ remove_elem (struct hash *h, struct hash_elem *e)
   list_remove (&e->list_elem);
 }
 
+struct list * hash_find_bucket(struct hash *,unsigned hash_value){
+    size_t bucket_idx = (hash_value) & (h->bucket_cnt - 1);
+    return &hash->bucket[bucket_idx];
+}

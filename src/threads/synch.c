@@ -391,4 +391,30 @@ cond_broadcast (struct condition *cond, struct lock *lock)
     cond_signal (cond, lock);
 }
 
+/*
+void readers_writer_lock_init(struct readers_writer_lock * rw_l){
+    lock_init(&rw_l->writer_lock);
+    lock_init(&rw_l->reader_lock);
+    cond_init(&rw_l->cond);
+    num_writers=0;
+    num_readers=0;
+    num_write_waiters=0;
+}
+
+
+void lock_read(struct readers_writer_lock *){
+    if(num_writers>0 ||num_write_waiters>0){
+    }
+    num_readers++;
+}
+
+
+
+void unlock_read(struct readers_writer_lock *);
+void lock_write(struct readers_writer_lock *);
+void unlock_write(struct readers_writer_lock *);
+*/
+
+
+
 
