@@ -426,7 +426,7 @@ remove_elem (struct hash *h, struct hash_elem *e)
   list_remove (&e->list_elem);
 }
 
-struct list * hash_find_bucket(struct hash *,unsigned hash_value){
+struct list * hash_find_bucket(struct hash *h,unsigned hash_value){
     size_t bucket_idx = (hash_value) & (h->bucket_cnt - 1);
-    return &hash->bucket[bucket_idx];
+    return &h->buckets[bucket_idx];
 }

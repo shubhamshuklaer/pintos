@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/synch.h"
+#include <hash.h>
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -125,7 +126,9 @@ struct thread
     struct semaphore parent_wait;
     
 #endif
-
+#ifdef VM
+    struct hash supp_page_table;
+#endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
   };

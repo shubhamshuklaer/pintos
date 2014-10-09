@@ -36,6 +36,9 @@
 #include "filesys/filesys.h"
 #include "filesys/fsutil.h"
 #endif
+#ifdef VM
+#include "vm/frame.h"
+#endif
 
 /* Amount of physical memory, in 4 kB pages. */
 size_t ram_pages;
@@ -106,6 +109,10 @@ main (void)
 #ifdef USERPROG
   exception_init ();
   syscall_init ();
+#endif
+
+#ifdef VM
+  frame_table_init();
 #endif
 
   /* Start thread scheduler and enable interrupts. */

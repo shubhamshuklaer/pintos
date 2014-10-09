@@ -118,3 +118,15 @@ end
 document debugpintos
     Attach debugger to pintos process
 end
+
+
+define loadusersymbols
+    shell objdump -h $arg0 | awk '/.text/ { print "add-symbol-file $arg0 0x"$4 }' > .loadsymbols
+    source .loadsymbols
+    shell rm -f .loadsymbols
+end
+document loadusersymbols
+    Load the symbols contained in a user program's executable.
+    Example:
+        loadusersymbols tests/userprog/exec-multiple
+end

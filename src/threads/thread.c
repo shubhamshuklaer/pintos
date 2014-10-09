@@ -18,6 +18,9 @@
   #ifdef USERPROG
   #include "userprog/process.h"
   #endif
+  #ifdef VM
+  #include "vm/page.h"
+  #endif
 
   /* Random value for struct thread's `magic' member.
      Used to detect stack overflow.  See the big comment at the top

@@ -22,6 +22,11 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "lib/string.h"
+#ifdef VM
+#include "vm/frame.h"
+#include "vm/page.h"
+#include <hash.h>
+#endif
 
 static thread_func start_process NO_RETURN;
 static bool load (const char *cmdline, void (**eip) (void), void **esp);
@@ -216,7 +221,9 @@ process_exit (void)
     parent_thread->num_child_procs--;
   }
   
-  
+#ifdef VM
+  free_process_resources();
+#endif  
   
 
   uint32_t *pd;
@@ -342,6 +349,9 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   off_t file_ofs;
   bool success = false;
   int i;
+#ifdef VM
+    hash_init(&(t->supp_page_table),&spt_hash_func,&spt_less_func,NULL);
+#endif    
 
   /* Allocate and activate page directory. */
   t->pagedir = pagedir_create ();
@@ -568,14 +578,23 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       size_t page_zero_bytes = PGSIZE - page_read_bytes;
 
       /* Get a page of memory. */
-      uint8_t *kpage = palloc_get_page (PAL_USER);
+#ifdef VM
+      uint8_t *kpage = vm_alloc_frame(PAL_USER,upage);
+#else
+      uint8_t *kpage = palloc_get_page(PAL_USER);
+#endif
+
       if (kpage == NULL)
         return false;
 
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-          palloc_free_page (kpage);
+#ifdef VM
+          vm_free_frame(kpage);
+#else
+          palloc_free_page(kpage);
+#endif
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -583,7 +602,11 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-          palloc_free_page (kpage);
+#ifdef VM
+          vm_free_frame(kpage);
+#else
+          palloc_free_page(kpage);
+#endif
           return false; 
         }
 
@@ -605,8 +628,11 @@ setup_stack (void **esp, const char *cmdline)
   
   uint8_t *kpage;
   bool success = false;
-
-  kpage = palloc_get_page (PAL_USER | PAL_ZERO);
+#ifdef VM
+  kpage = vm_alloc_frame(PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
+#else
+  kpage = palloc_get_page(PAL_USER | PAL_ZERO );
+#endif
   // printf("%s\n", "got page");
   if (kpage != NULL) {
     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
@@ -695,7 +721,11 @@ setup_stack (void **esp, const char *cmdline)
     
     // printf("%s\n", "building stack 8");
     }else{
-      palloc_free_page (kpage);
+#ifdef VM
+          vm_free_frame(kpage);
+#else
+          palloc_free_page(kpage);
+#endif
       // printf("%s\n", "building stack 9");
     }
   }
