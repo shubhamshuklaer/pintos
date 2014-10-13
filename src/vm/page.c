@@ -5,18 +5,26 @@
 #include "threads/palloc.h"
 #include "threads/malloc.h"
 #include <debug.h>
+#include "filesys/file.h"
+#include "userprog/process.h"
+#include <string.h>
+
+static unsigned spt_hash_u_vaddr(void * u_vaddr);
 
 
-bool spte_install_fs(void * u_vaddr, struct file * f,off_t offset,
+bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable){
    struct thread * t;
    t=thread_current(); 
    struct supp_page_table_entry * spte=(struct supp_page_table_entry *)malloc(sizeof(struct supp_page_table_entry));
-   if(spte==NULL)
+   if(spte==NULL){
+       //printf("spte entry memory alloc failed");
        return false;
+   }
+   //if(u_vaddr==NULL)//0 is not null
+     //  return false;
    spte->u_vaddr=u_vaddr;
    spte->writable=writable;
-   spte->file=f;
    spte->offset=offset;
    spte->read_bytes=read_bytes;
    spte->zero_bytes=zero_bytes;
@@ -24,10 +32,18 @@ bool spte_install_fs(void * u_vaddr, struct file * f,off_t offset,
    spte->is_loaded=false;
    spte->k_vaddr=NULL;
    spte->swap_page=-1;
-   if(!hash_insert(&t->supp_page_table,spte))
+   spte->magic=1234;
+   spte->file_name = malloc(strlen(file_name)+1);
+   strlcpy(spte->file_name,file_name, strlen(file_name)+1);
+   //printf("file size %d\n",f->inode->data.length);
+   //printf("upaage %p\n",u_vaddr);
+   if(!hash_insert(&t->supp_page_table,&spte->elem)){
         return true;
-   else
-        return false;   
+   }else{
+        //printf("supp_page_table %p, page_entry u_vaddr %p\n",&t->supp_page_table,spte->u_vaddr);
+       // printf("hash_insert failed\n");
+        return false;
+   }   
 
 }
 
@@ -36,6 +52,7 @@ void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    if(spte->is_loaded){
        vm_free_frame(spte->k_vaddr);  
    }
+   free(spte->file_name);
    free(spte);
 }
 
@@ -44,6 +61,74 @@ void free_process_resources(){
     t=thread_current();
     hash_destroy(&t->supp_page_table,&destroy_spte); 
 }
+
+
+struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
+    struct hash_elem *elem;
+    struct list *bucket;
+    struct thread * t=thread_current();
+    bucket=hash_find_bucket(&t->supp_page_table,spt_hash_u_vaddr(u_vaddr));
+    struct list_elem *i;
+    bool found=false;
+    struct supp_page_table_entry *spte;
+    for (i = list_begin (bucket); i != list_end (bucket); i = list_next (i)){
+        elem = list_elem_to_hash_elem (i);
+        spte=hash_entry(elem,struct supp_page_table_entry,elem);
+        if(spte->u_vaddr==u_vaddr){
+            found=true;
+            break;
+        }
+    }
+    if(found)
+       return spte;
+    else
+       return NULL; 
+
+}
+
+
+bool load_spte_fs(struct supp_page_table_entry *spte){
+    if(!spte)
+        return false;
+    //printf("upaage %p\n",spte->u_vaddr);
+    uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
+    if (kpage == NULL)
+       return false;
+    struct file *file;
+    if(!&filesys_lock){
+        // printf("no filesys lock yet\n");
+        lock_init(&filesys_lock);
+    }
+    lock_acquire(&filesys_lock);
+    // printf("filesys lock acquired\n");
+    file = filesys_open (spte->file_name);
+    lock_release(&filesys_lock);
+    if(!file)
+        return false;
+      /* Load this page. */
+    int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
+    if (bytes_read != (int) spte->read_bytes){
+       vm_free_frame(kpage);
+       printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+       file_close(file);
+       return false; 
+    }
+    memset (kpage + spte->read_bytes, 0, spte->zero_bytes);
+
+      /* Add the page to the process's address space. */
+    if (!install_page (spte->u_vaddr, kpage,spte->writable)) {
+          vm_free_frame(kpage);
+          file_close(file);
+          return false; 
+    }
+    spte->is_loaded=true;
+    spte->k_vaddr=kpage;
+    file_close(file);
+    return true;
+}
+
+
+
 
 bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
    struct supp_page_table_entry * spte_a=hash_entry(a,struct supp_page_table_entry,elem);
@@ -60,4 +145,8 @@ bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *au
 unsigned spt_hash_func (const struct hash_elem *e, void *aux){
    struct supp_page_table_entry * spte=hash_entry(e,struct supp_page_table_entry,elem);
    return hash_int((int)(spte->u_vaddr));
+}
+
+static unsigned spt_hash_u_vaddr(void * u_vaddr){
+   return hash_int((int)u_vaddr);
 }

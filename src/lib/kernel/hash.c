@@ -99,8 +99,15 @@ hash_insert (struct hash *h, struct hash_elem *new)
   struct list *bucket = find_bucket (h, new);
   struct hash_elem *old = find_elem (h, bucket, new);
 
-  if (old == NULL) 
+  if (old == NULL){ 
     insert_elem (h, bucket, new);
+  }else{
+    //struct supp_page_table_entry *a,*b;
+    //a=hash_entry(old,struct supp_page_table_entry,elem); 
+    //b=hash_entry(new,struct supp_page_table_entry,elem);
+    //debug_backtrace();
+    //printf("Element already exist..!! old %p new : %p\n",a->u_vaddr,b->u_vaddr);
+  }
 
   rehash (h);
 

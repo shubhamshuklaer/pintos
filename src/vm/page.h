@@ -23,7 +23,7 @@ struct supp_page_table_entry{
     void * k_vaddr;
    
     //used for file entry
-    struct file *file;
+    char * file_name;
     off_t offset;
     uint32_t read_bytes;
     uint32_t zero_bytes; 
@@ -31,14 +31,18 @@ struct supp_page_table_entry{
     //swap entry
     int swap_page; 
     struct hash_elem elem;
+    int magic;
 };
 
 void free_process_resources();
 
-bool spte_install_fs(void * u_vaddr, struct file * f,off_t offset,
+bool spte_install_fs(void * u_vaddr, char * file_name,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable);
 
 bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux);
 unsigned spt_hash_func (const struct hash_elem *e, void *aux);
+
+struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr);
+bool load_spte_fs(struct supp_page_table_entry *);
 
 #endif /* vm/page.h */

@@ -22,6 +22,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "lib/string.h"
+#include "filesys/inode.h"
 #ifdef VM
 #include "vm/frame.h"
 #include "vm/page.h"
@@ -122,7 +123,7 @@ start_process (void *cmdline_)
       thread_yield();
     }
   }else{
-    // printf("%s\n", "not successful");
+    //printf("%s\n", "not successful");
     palloc_free_page (cmdline);
     thread_current()->exit_status = -1;
     printf ("%s: exit(%d)\n", thread_current()->name, -1);
@@ -333,7 +334,7 @@ static bool setup_stack (void **esp, const char *cmdline);
 static bool validate_segment (const struct Elf32_Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
                           uint32_t read_bytes, uint32_t zero_bytes,
-                          bool writable);
+                          bool writable,char * file_name);
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
    Stores the executable's entry point into *EIP
@@ -350,7 +351,10 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   bool success = false;
   int i;
 #ifdef VM
-    hash_init(&(t->supp_page_table),&spt_hash_func,&spt_less_func,NULL);
+    if(!hash_init(&(t->supp_page_table),&spt_hash_func,&spt_less_func,NULL)){
+        //printf("supp_page_table hash_init failed\n");
+        return false;
+    }
 #endif    
 
   /* Allocate and activate page directory. */
@@ -364,7 +368,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   char *cmdline_copy = malloc(strlen(cmdline)+1);
   strlcpy(cmdline_copy, cmdline, strlen(cmdline)+1);
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
-  // printf("name of file : %s\n", file_name);
+  //printf("name of file : %s\n", file_name);
 
   if(!&filesys_lock){
     // printf("no filesys lock yet\n");
@@ -394,7 +398,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
       goto done; 
     }
 
-  // printf("%s\n", "reading program headers");
+ // printf("%s\n", "reading program headers");
   /* Read program headers. */
   file_ofs = ehdr.e_phoff;
   for (i = 0; i < ehdr.e_phnum; i++) 
@@ -451,8 +455,8 @@ load (const char *cmdline, void (**eip) (void), void **esp)
               zero_bytes = ROUND_UP (page_offset + phdr.p_memsz, PGSIZE);
             }
           if (!load_segment (file, file_page, (void *) mem_page,
-                             read_bytes, zero_bytes, writable)){
-            // printf("%s\n", "failed loading segment");
+                             read_bytes, zero_bytes, writable,file_name)){
+           //  printf("%s\n", "failed loading segment");
             goto done;
           }else{
             // printf("%s\n", "passed loading segment");
@@ -487,7 +491,7 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
-static bool install_page (void *upage, void *kpage, bool writable);
+bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in
    FILE and returns true if so, false otherwise. */
@@ -560,7 +564,7 @@ validate_segment (const struct Elf32_Phdr *phdr, struct file *file)
    or disk read error occurs. */
 static bool
 load_segment (struct file *file, off_t ofs, uint8_t *upage,
-              uint32_t read_bytes, uint32_t zero_bytes, bool writable) 
+              uint32_t read_bytes, uint32_t zero_bytes, bool writable,char * file_name) 
 {
   ASSERT ((read_bytes + zero_bytes) % PGSIZE == 0);
   ASSERT (pg_ofs (upage) == 0);
@@ -579,10 +583,15 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
       /* Get a page of memory. */
 #ifdef VM
-      uint8_t *kpage = vm_alloc_frame(PAL_USER,upage);
+      if(!spte_install_fs(upage,file_name,ofs,page_read_bytes,page_zero_bytes,writable)){
+          printf("install spte failed %p\n",upage);
+          return false; 
+      }
+      //printf("file size %d\n",file->inode->data.length);
+      //printf("upaage %p\n",upage);
+      ofs+=page_read_bytes;
 #else
       uint8_t *kpage = palloc_get_page(PAL_USER);
-#endif
 
       if (kpage == NULL)
         return false;
@@ -590,11 +599,7 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Load this page. */
       if (file_read (file, kpage, page_read_bytes) != (int) page_read_bytes)
         {
-#ifdef VM
-          vm_free_frame(kpage);
-#else
           palloc_free_page(kpage);
-#endif
           return false; 
         }
       memset (kpage + page_read_bytes, 0, page_zero_bytes);
@@ -602,14 +607,10 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
       /* Add the page to the process's address space. */
       if (!install_page (upage, kpage, writable)) 
         {
-#ifdef VM
-          vm_free_frame(kpage);
-#else
           palloc_free_page(kpage);
-#endif
           return false; 
         }
-
+#endif
       /* Advance. */
       read_bytes -= page_read_bytes;
       zero_bytes -= page_zero_bytes;
@@ -745,7 +746,7 @@ setup_stack (void **esp, const char *cmdline)
    with palloc_get_page().
    Returns true on success, false if UPAGE is already mapped or
    if memory allocation fails. */
-static bool
+bool
 install_page (void *upage, void *kpage, bool writable)
 {
   struct thread *t = thread_current ();
