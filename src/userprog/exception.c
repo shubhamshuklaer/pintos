@@ -162,17 +162,8 @@ page_fault (struct intr_frame *f)
         goto done;
      struct supp_page_table_entry *spte;
      spte=lookup_supp_page_table(pg_round_down(fault_addr));
-     if(!spte)
-        goto done;
-     switch(spte->type){
-         case SPTE_FS:
-             if(!load_spte(spte))
-                 goto done;
-             break;
-         default:
-             goto done;
-     } 
-     return;      
+     if(spte!=NULL&&load_spte(spte))
+        return;      
   }
 #endif
   /* To implement virtual memory, delete the rest of the function
@@ -183,7 +174,7 @@ page_fault (struct intr_frame *f)
   //         not_present ? "not present" : "rights violation",
   //         write ? "writing" : "reading",
   //         user ? "user" : "kernel");
-done:
+done :
   if(!user){
      //printf("Kernel page fault!\n");
      f->eip = f->eax;

@@ -14,6 +14,8 @@ struct frame_table_entry{
     struct hash_elem elem;
 };
 
+//initilizes the frame table..!!
+//frame table is global
 void frame_table_init();
 
 //allocates a frame form user pool flags must contain PAL_USER 
