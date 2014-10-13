@@ -4,6 +4,7 @@
 #include "threads/thread.h"
 #include "threads/palloc.h"
 #include "threads/malloc.h"
+#include "threads/vaddr.h"
 #include <debug.h>
 #include "filesys/file.h"
 #include "userprog/process.h"
@@ -47,6 +48,41 @@ bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
 
 }
 
+
+bool spte_install_zero(void * u_vaddr,bool writable){
+   struct thread * t;
+   t=thread_current(); 
+   struct supp_page_table_entry * spte=(struct supp_page_table_entry *)malloc(sizeof(struct supp_page_table_entry));
+   if(spte==NULL){
+       //printf("spte entry memory alloc failed");
+       return false;
+   }
+   //if(u_vaddr==NULL)//0 is not null
+     //  return false;
+   spte->u_vaddr=u_vaddr;
+   spte->writable=writable;
+   spte->offset=-1;
+   spte->read_bytes=-1;
+   spte->zero_bytes=-1;
+   spte->type=SPTE_ZERO;
+   spte->is_loaded=false;
+   spte->k_vaddr=NULL;
+   spte->swap_page=-1;
+   spte->file_name = NULL;
+   //printf("file size %d\n",f->inode->data.length);
+   //printf("upaage %p\n",u_vaddr);
+   if(!hash_insert(&t->supp_page_table,&spte->elem)){
+        return true;
+   }else{
+        //printf("supp_page_table %p, page_entry u_vaddr %p\n",&t->supp_page_table,spte->u_vaddr);
+       // printf("hash_insert failed\n");
+        return false;
+   } 
+}
+
+
+
+
 void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    struct supp_page_table_entry *spte=hash_entry(e,struct supp_page_table_entry,elem);
    if(spte->is_loaded){
@@ -87,43 +123,52 @@ struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
 }
 
 
-bool load_spte_fs(struct supp_page_table_entry *spte){
+bool load_spte(struct supp_page_table_entry *spte){
     if(!spte)
+        return false;
+    if(spte->is_loaded)
         return false;
     //printf("upaage %p\n",spte->u_vaddr);
     uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
     if (kpage == NULL)
        return false;
-    struct file *file;
-    if(!&filesys_lock){
-        // printf("no filesys lock yet\n");
-        lock_init(&filesys_lock);
+    
+    switch(spte->type){
+        case SPTE_FS : ;//this is an empty statement as a label can only be part of a statement and a declaration is not a statement
+            struct file *file;
+            if(!&filesys_lock)
+                lock_init(&filesys_lock);
+            lock_acquire(&filesys_lock);
+            file = filesys_open (spte->file_name);
+            lock_release(&filesys_lock);
+            if(!file){
+                vm_free_frame(kpage);
+                return false;
+            }
+            int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
+            if (bytes_read != (int) spte->read_bytes){
+                vm_free_frame(kpage);
+                //printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+                file_close(file);
+                return false; 
+            }
+            memset(kpage + spte->read_bytes, 0, spte->zero_bytes);
+            file_close(file);
+            break;
+        case SPTE_ZERO :
+            memset(kpage,0,PGSIZE);
+            break;
+        default :
+            vm_free_frame(kpage);
+            return false;
     }
-    lock_acquire(&filesys_lock);
-    // printf("filesys lock acquired\n");
-    file = filesys_open (spte->file_name);
-    lock_release(&filesys_lock);
-    if(!file)
-        return false;
-      /* Load this page. */
-    int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
-    if (bytes_read != (int) spte->read_bytes){
-       vm_free_frame(kpage);
-       printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
-       file_close(file);
-       return false; 
-    }
-    memset (kpage + spte->read_bytes, 0, spte->zero_bytes);
-
-      /* Add the page to the process's address space. */
+    // Add the page to the process's address space
     if (!install_page (spte->u_vaddr, kpage,spte->writable)) {
           vm_free_frame(kpage);
-          file_close(file);
           return false; 
     }
     spte->is_loaded=true;
     spte->k_vaddr=kpage;
-    file_close(file);
     return true;
 }
 

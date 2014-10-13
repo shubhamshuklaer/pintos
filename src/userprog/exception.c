@@ -166,7 +166,7 @@ page_fault (struct intr_frame *f)
         goto done;
      switch(spte->type){
          case SPTE_FS:
-             if(!load_spte_fs(spte))
+             if(!load_spte(spte))
                  goto done;
              break;
          default:
