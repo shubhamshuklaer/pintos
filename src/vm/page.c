@@ -10,10 +10,12 @@
 #include "userprog/process.h"
 #include <string.h>
 
-static unsigned spt_hash_u_vaddr(void * u_vaddr);
+static unsigned 
+spt_hash_u_vaddr(void * u_vaddr);
 
 
-bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
+bool 
+spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable){
    struct thread * t;
    t=thread_current(); 
@@ -49,7 +51,8 @@ bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
 }
 
 
-bool spte_install_zero(void * u_vaddr,bool writable){
+bool 
+spte_install_zero(void * u_vaddr,bool writable){
    struct thread * t;
    t=thread_current(); 
    struct supp_page_table_entry * spte=(struct supp_page_table_entry *)malloc(sizeof(struct supp_page_table_entry));
@@ -83,7 +86,8 @@ bool spte_install_zero(void * u_vaddr,bool writable){
 
 
 
-void destroy_spte(struct hash_elem *e, void *aux UNUSED){
+void 
+destroy_spte(struct hash_elem *e, void *aux UNUSED){
    struct supp_page_table_entry *spte=hash_entry(e,struct supp_page_table_entry,elem);
    if(spte->is_loaded){
        vm_free_frame(spte->k_vaddr);  
@@ -92,14 +96,16 @@ void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    free(spte);
 }
 
-void free_process_resources(){
+void 
+free_process_resources(){
     struct thread *t;
     t=thread_current();
     hash_destroy(&t->supp_page_table,&destroy_spte); 
 }
 
 
-struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
+struct supp_page_table_entry * 
+lookup_supp_page_table(void * u_vaddr){
     struct hash_elem *elem;
     struct list *bucket;
     struct thread * t=thread_current();
@@ -123,12 +129,13 @@ struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
 }
 
 
-bool load_spte(struct supp_page_table_entry *spte){
+bool 
+load_spte(struct supp_page_table_entry *spte){
     if(!spte)
         return false;
     if(spte->is_loaded)
         return false;
-    //printf("upaage %p\n",spte->u_vaddr);
+    printf("upage %p\n",spte->u_vaddr);
     uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
     if (kpage == NULL)
        return false;
@@ -148,7 +155,7 @@ bool load_spte(struct supp_page_table_entry *spte){
             int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
             if (bytes_read != (int) spte->read_bytes){
                 vm_free_frame(kpage);
-                //printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+                printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
                 file_close(file);
                 return false; 
             }
@@ -175,7 +182,8 @@ bool load_spte(struct supp_page_table_entry *spte){
 
 
 
-bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
+bool 
+spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
    struct supp_page_table_entry * spte_a=hash_entry(a,struct supp_page_table_entry,elem);
    struct supp_page_table_entry * spte_b=hash_entry(b,struct supp_page_table_entry,elem);
    if(spte_a->u_vaddr < spte_b->u_vaddr)
@@ -187,11 +195,29 @@ bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *au
 
 
 
-unsigned spt_hash_func (const struct hash_elem *e, void *aux){
+unsigned 
+spt_hash_func (const struct hash_elem *e, void *aux){
    struct supp_page_table_entry * spte=hash_entry(e,struct supp_page_table_entry,elem);
    return hash_int((int)(spte->u_vaddr));
 }
 
-static unsigned spt_hash_u_vaddr(void * u_vaddr){
+static unsigned 
+spt_hash_u_vaddr(void * u_vaddr){
    return hash_int((int)u_vaddr);
+}
+
+bool 
+grow_stack(void *u_vaddr){
+  printf("growing stack\n");
+  spte_install_zero(u_vaddr,1);
+
+  printf("spte installed\n");
+  
+  struct supp_page_table_entry * spte = lookup_supp_page_table(u_vaddr);
+  
+  printf("spte found\n");
+  
+  load_spte(spte);
+  printf("spte loaded\n");
+  return true;
 }

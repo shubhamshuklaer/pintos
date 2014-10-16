@@ -621,7 +621,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-// memcpy (void *dst_, const void *src_, size_t size) ;
+
+// memcpy usage --> memcpy (void *dst_, const void *src_, size_t size) ;
+
 static bool
 setup_stack (void **esp, const char *cmdline) 
 {
@@ -757,6 +759,8 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
+
+// file processes
 
 int process_add_file(struct file * file_ptr){
   struct process_file *pf=(struct process_file *)malloc(sizeof(struct process_file));

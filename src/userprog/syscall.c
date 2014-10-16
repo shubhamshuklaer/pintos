@@ -177,7 +177,7 @@ validate_string(const char * str){
 
     // print currently saved registers
 
-    // printf ("system call!\n");
+    printf ("system call!\n");
     // printf ("edi : %d\n", f->edi);
     // printf ("esi : %d\n", f->esi);
     // printf ("ebp : %d\n", f->ebp);
