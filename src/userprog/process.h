@@ -17,7 +17,6 @@ void process_activate (void);
 int process_add_file(struct file * file_ptr);
 struct file * process_get_file(int fd);
 int process_close_file(int fd);
-struct lock filesys_lock;
 bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/process.h */

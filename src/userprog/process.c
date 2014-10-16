@@ -370,14 +370,8 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
   //printf("name of file : %s\n", file_name);
 
-  if(!&filesys_lock){
-    // printf("no filesys lock yet\n");
-    lock_init(&filesys_lock);
-  }
-  lock_acquire(&filesys_lock);
   // printf("filesys lock acquired\n");
   file = filesys_open (file_name);
-  lock_release(&filesys_lock);
 
   if (file == NULL) 
     {
