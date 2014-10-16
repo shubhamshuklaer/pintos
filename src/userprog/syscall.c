@@ -177,7 +177,7 @@ validate_string(const char * str){
 
     // print currently saved registers
 
-    printf ("system call!\n");
+    // printf ("system call!\n");
     // printf ("edi : %d\n", f->edi);
     // printf ("esi : %d\n", f->esi);
     // printf ("ebp : %d\n", f->ebp);
@@ -195,7 +195,7 @@ validate_string(const char * str){
     // printf ("eip: %p\n", f->eip);
     // printf ("cs : %d\n", f->cs);
     // printf ("eflags : %d\n", f->eflags);
-    // printf ("esp : %p\n", f->esp);
+    printf ("esp : %p\n", f->esp);
     // printf ("ss : %d\n", f->ss);
 
     // dump stack
@@ -653,6 +653,7 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "read syscall !");
+    printf ("esp : %p\n", f->esp);
     // retrieve fd
     int fd =get_four_bytes_user(f->esp+4);
 
@@ -661,6 +662,7 @@ validate_string(const char * str){
 
     //retrieve size
     unsigned size = get_four_bytes_user(f->esp+12);
+    printf ("esp : %p\n", f->esp);
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
     if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
@@ -668,6 +670,7 @@ validate_string(const char * str){
       exit_on_error();
       return;
     }
+    printf ("esp : %p\n", f->esp);
     /////////////////////////////////////////////////////////////////////
     if(fd==STDIN_FILENO){
         int i;

@@ -158,7 +158,7 @@ page_fault (struct intr_frame *f)
 
 
 #ifdef VM  
-  	// printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+  	printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
 	if(not_present){
 		if(!is_user_vaddr(fault_addr))
 			goto done;
@@ -168,12 +168,12 @@ page_fault (struct intr_frame *f)
 			return;      
 
 		// check for stack access
-		// printf("Fault address: %p\n", fault_addr);
-		if(fault_addr >= thread_current()->esp_initial - STACK_UNDERFLOW){
+		printf("Fault address: %p\n", fault_addr);
+		if(fault_addr >= f->esp - STACK_UNDERFLOW){
 			printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
 			// stack growth required
-			if(grow_stack(thread_current()->esp_initial)){
-				printf("stack growth successful\n");
+			if(grow_stack(fault_addr)){
+				// printf("stack growth successful\n");
 				return;
 			}
 		}
@@ -190,7 +190,7 @@ page_fault (struct intr_frame *f)
 		user ? "user" : "kernel");
 done :
   if(!user){
-     //printf("Kernel page fault!\n");
+     printf("Kernel page fault!\n");
      f->eip = f->eax;
      f->eax = 0xffffffff;
      return;
