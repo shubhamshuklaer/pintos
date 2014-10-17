@@ -34,6 +34,7 @@ bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
    spte->k_vaddr=NULL;
    spte->swap_page=-1;
    spte->magic=1234;
+   spte->file_ptr=NULL;
    spte->file_name = malloc(strlen(file_name)+1);
    strlcpy(spte->file_name,file_name, strlen(file_name)+1);
    //printf("file size %d\n",f->inode->data.length);
@@ -69,6 +70,8 @@ bool spte_install_zero(void * u_vaddr,bool writable){
    spte->k_vaddr=NULL;
    spte->swap_page=-1;
    spte->file_name = NULL;
+   spte->magic=1234;
+   spte->file_ptr=NULL;
    //printf("file size %d\n",f->inode->data.length);
    //printf("upaage %p\n",u_vaddr);
    if(!hash_insert(&t->supp_page_table,&spte->elem)){
@@ -80,6 +83,46 @@ bool spte_install_zero(void * u_vaddr,bool writable){
    } 
 }
 
+
+
+//install mmap entry
+bool spte_install_mmap(void * u_vaddr, struct file * f,off_t offset,
+        uint32_t read_bytes, uint32_t zero_bytes,bool writable){
+   struct thread * t;
+   t=thread_current(); 
+   struct supp_page_table_entry * spte=(struct supp_page_table_entry *)malloc(sizeof(struct supp_page_table_entry));
+   if(spte==NULL){
+       //printf("spte entry memory alloc failed");
+       return false;
+   }
+   if(!f)
+       return false;
+   //if(u_vaddr==NULL)//0 is not null
+     //  return false;
+   spte->u_vaddr=u_vaddr;
+   spte->writable=writable;
+   spte->offset=offset;
+   spte->read_bytes=read_bytes;
+   spte->zero_bytes=zero_bytes;
+   spte->type=SPTE_FS;
+   spte->is_loaded=false;
+   spte->k_vaddr=NULL;
+   spte->swap_page=-1;
+   spte->magic=1234;
+   spte->file_ptr=f;
+   spte->file_name=NULL;
+   //printf("file size %d\n",f->inode->data.length);
+   //printf("upaage %p\n",u_vaddr);
+   if(!hash_insert(&t->supp_page_table,&spte->elem)){
+        return true;
+   }else{
+        //printf("supp_page_table %p, page_entry u_vaddr %p\n",&t->supp_page_table,spte->u_vaddr);
+       // printf("hash_insert failed\n");
+        return false;
+   } 
+
+    
+}
 
 
 
@@ -132,7 +175,7 @@ bool load_spte(struct supp_page_table_entry *spte){
     uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
     if (kpage == NULL)
        return false;
-    
+    int bytes_read;    
     switch(spte->type){
         case SPTE_FS : ;//this is an empty statement as a label can only be part of a statement and a declaration is not a statement
             struct file *file;
@@ -141,7 +184,7 @@ bool load_spte(struct supp_page_table_entry *spte){
                 vm_free_frame(kpage);
                 return false;
             }
-            int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
+            bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
             if (bytes_read != (int) spte->read_bytes){
                 vm_free_frame(kpage);
                 // printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
@@ -153,6 +196,15 @@ bool load_spte(struct supp_page_table_entry *spte){
             break;
         case SPTE_ZERO :
             memset(kpage,0,PGSIZE);
+            break;
+        case SPTE_MMAP :
+            bytes_read=file_read_at(spte->file_ptr, kpage, spte->read_bytes,spte->offset);
+            if (bytes_read != (int) spte->read_bytes){
+                vm_free_frame(kpage);
+                // printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+                return false; 
+            }
+            memset(kpage + spte->read_bytes, 0, spte->zero_bytes);
             break;
         default :
             vm_free_frame(kpage);

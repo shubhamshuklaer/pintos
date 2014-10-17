@@ -28,7 +28,9 @@ struct supp_page_table_entry{
     off_t offset;
     uint32_t read_bytes;
     uint32_t zero_bytes; 
-   
+    
+    //mmap
+    struct file * file_ptr;
     //swap entry
     int swap_page; 
     struct hash_elem elem;
@@ -57,5 +59,10 @@ struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr);
 
 // grow stack - return true if success
 bool grow_stack(void *u_vaddr);
+
+//install mmap entry
+bool spte_install_mmap(void * u_vaddr, struct file * f,off_t offset,
+        uint32_t read_bytes, uint32_t zero_bytes,bool writable);
+
 
 #endif /* vm/page.h */
