@@ -195,8 +195,9 @@ static unsigned spt_hash_u_vaddr(void * u_vaddr){
 bool 
 grow_stack(void *u_vaddr){
   u_vaddr = pg_round_down (u_vaddr);
-  
+  printf("");
   // printf("growing stack\n");
+
   spte_install_zero(u_vaddr,1);
 
   // printf("spte installed\n");
