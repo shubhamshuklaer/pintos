@@ -190,7 +190,7 @@ page_fault (struct intr_frame *f)
 		user ? "user" : "kernel");
 done :
   if(!user){
-     printf("Kernel page fault!\n");
+     //printf("Kernel page fault!\n");
      f->eip = f->eax;
      f->eax = 0xffffffff;
      return;

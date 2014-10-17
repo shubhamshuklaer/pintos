@@ -10,12 +10,10 @@
 #include "userprog/process.h"
 #include <string.h>
 
-static unsigned 
-spt_hash_u_vaddr(void * u_vaddr);
+static unsigned spt_hash_u_vaddr(void * u_vaddr);
 
 
-bool 
-spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
+bool spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable){
    struct thread * t;
    t=thread_current(); 
@@ -51,8 +49,7 @@ spte_install_fs(void * u_vaddr, char  * file_name,off_t offset,
 }
 
 
-bool 
-spte_install_zero(void * u_vaddr,bool writable){
+bool spte_install_zero(void * u_vaddr,bool writable){
    struct thread * t;
    t=thread_current(); 
    struct supp_page_table_entry * spte=(struct supp_page_table_entry *)malloc(sizeof(struct supp_page_table_entry));
@@ -86,8 +83,7 @@ spte_install_zero(void * u_vaddr,bool writable){
 
 
 
-void 
-destroy_spte(struct hash_elem *e, void *aux UNUSED){
+void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    struct supp_page_table_entry *spte=hash_entry(e,struct supp_page_table_entry,elem);
    if(spte->is_loaded){
        vm_free_frame(spte->k_vaddr);  
@@ -96,16 +92,14 @@ destroy_spte(struct hash_elem *e, void *aux UNUSED){
    free(spte);
 }
 
-void 
-free_process_resources(){
+void free_process_resources(){
     struct thread *t;
     t=thread_current();
     hash_destroy(&t->supp_page_table,&destroy_spte); 
 }
 
 
-struct supp_page_table_entry * 
-lookup_supp_page_table(void * u_vaddr){
+struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
     struct hash_elem *elem;
     struct list *bucket;
     struct thread * t=thread_current();
@@ -129,8 +123,7 @@ lookup_supp_page_table(void * u_vaddr){
 }
 
 
-bool 
-load_spte(struct supp_page_table_entry *spte){
+bool load_spte(struct supp_page_table_entry *spte){
     if(!spte)
         return false;
     if(spte->is_loaded)
@@ -182,8 +175,7 @@ load_spte(struct supp_page_table_entry *spte){
 
 
 
-bool 
-spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
+bool spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
    struct supp_page_table_entry * spte_a=hash_entry(a,struct supp_page_table_entry,elem);
    struct supp_page_table_entry * spte_b=hash_entry(b,struct supp_page_table_entry,elem);
    if(spte_a->u_vaddr < spte_b->u_vaddr)
@@ -195,14 +187,12 @@ spt_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux){
 
 
 
-unsigned 
-spt_hash_func (const struct hash_elem *e, void *aux){
+unsigned spt_hash_func (const struct hash_elem *e, void *aux){
    struct supp_page_table_entry * spte=hash_entry(e,struct supp_page_table_entry,elem);
    return hash_int((int)(spte->u_vaddr));
 }
 
-static unsigned 
-spt_hash_u_vaddr(void * u_vaddr){
+static unsigned spt_hash_u_vaddr(void * u_vaddr){
    return hash_int((int)u_vaddr);
 }
 

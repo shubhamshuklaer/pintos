@@ -195,7 +195,7 @@ validate_string(const char * str){
     // printf ("eip: %p\n", f->eip);
     // printf ("cs : %d\n", f->cs);
     // printf ("eflags : %d\n", f->eflags);
-    printf ("esp : %p\n", f->esp);
+    // printf ("esp : %p\n", f->esp);
     // printf ("ss : %d\n", f->ss);
 
     // dump stack
