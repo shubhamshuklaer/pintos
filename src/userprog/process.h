@@ -14,9 +14,14 @@ tid_t process_execute (const char *file_name);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (void);
+
+// vm
 int process_add_file(struct file * file_ptr);
 struct file * process_get_file(int fd);
 int process_close_file(int fd);
+
+
+struct lock filesys_lock;
 bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/process.h */

@@ -370,8 +370,14 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
   //printf("name of file : %s\n", file_name);
 
+  if(!&filesys_lock){
+    // printf("no filesys lock yet\n");
+    lock_init(&filesys_lock);
+  }
+  lock_acquire(&filesys_lock);
   // printf("filesys lock acquired\n");
   file = filesys_open (file_name);
+  lock_release(&filesys_lock);
 
   if (file == NULL) 
     {
@@ -615,7 +621,9 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 /* Create a minimal stack by mapping a zeroed page at the top of
    user virtual memory. */
-// memcpy (void *dst_, const void *src_, size_t size) ;
+
+// memcpy usage --> memcpy (void *dst_, const void *src_, size_t size) ;
+
 static bool
 setup_stack (void **esp, const char *cmdline) 
 {
@@ -751,6 +759,8 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
+
+// file processes
 
 int process_add_file(struct file * file_ptr){
   struct process_file *pf=(struct process_file *)malloc(sizeof(struct process_file));

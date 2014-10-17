@@ -340,6 +340,7 @@ make_idtr_operand (uint16_t limit, void *base)
 void
 intr_handler (struct intr_frame *frame) 
 {
+
   bool external;
   intr_handler_func *handler;
 
@@ -347,7 +348,7 @@ intr_handler (struct intr_frame *frame)
      We only handle one at a time (so interrupts must be off)
      and they need to be acknowledged on the PIC (see below).
      An external interrupt handler cannot sleep. */
-  external = frame->vec_no >= 0x20 && frame->vec_no < 0x30;
+  external = frame->vec_no >= 0x20 && frame->vec_no < 0x30; // 0x20 to 0x2f
   if (external) 
     {
       ASSERT (intr_get_level () == INTR_OFF);
@@ -356,6 +357,15 @@ intr_handler (struct intr_frame *frame)
       in_external_intr = true;
       yield_on_return = false;
     }
+
+  // check for page fault and store the stack pointer
+  if (frame->vec_no == 14){
+    // printf("interrupt handler called\n");
+    // printf("stack ptr: %p\n", frame->esp);
+    // printf("vector no.  0x%02x\n", frame->vec_no);
+
+    thread_current()->esp_initial = frame->esp;
+  }
 
   /* Invoke the interrupt's handler. */
   handler = intr_handlers[frame->vec_no];

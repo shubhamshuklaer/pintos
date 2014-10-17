@@ -128,6 +128,7 @@ struct thread
 #endif
 #ifdef VM
     struct hash supp_page_table;
+    void **esp_initial;
 #endif
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */

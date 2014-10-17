@@ -5,6 +5,7 @@
 #include "filesys/file.h"
 #include <stdio.h>
 
+#define STACK_MAX_SIZE 30
 
 enum spte_type{
     SPTE_FS,//page in file system as a file
@@ -40,6 +41,7 @@ void free_process_resources();
 //Adds a entry of type SPTE_FS into the current thread's supplement page table
 bool spte_install_fs(void * u_vaddr, char * file_name,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable);
+
 //Adds a entry of type SPTE_ZERO into the current thread's supplement page table
 bool spte_install_zero(void * u_vaddr,bool writable);
 
@@ -52,5 +54,8 @@ unsigned spt_hash_func (const struct hash_elem *e, void *aux);
 
 //Searches the current thread's supplement page table
 struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr);
+
+// grow stack - return true if success
+bool grow_stack(void *u_vaddr);
 
 #endif /* vm/page.h */

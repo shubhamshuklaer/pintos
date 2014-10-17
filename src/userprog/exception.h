@@ -9,4 +9,6 @@
 void exception_init (void);
 void exception_print_stats (void);
 
+#define STACK_UNDERFLOW 0x32
+
 #endif /* userprog/exception.h */
