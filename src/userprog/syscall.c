@@ -523,15 +523,12 @@ validate_string(const char * str){
     
     // printf("file name: %s\n", file_name);
 
-    lock_acquire(&filesys_lock);
     // printf("create 3\n");
     if(filesys_create (file_name,initial_size)){
       // printf("created\n");
-       lock_release(&filesys_lock);
        f->eax=true;
     }else{ 
       // printf("could not create\n");
-        lock_release(&filesys_lock);
         f->eax=false;
     }
     return;  
@@ -559,12 +556,9 @@ validate_string(const char * str){
     
     // printf("file name: %s\n", file_name);
 
-    lock_acquire(&filesys_lock);
     if(filesys_remove (file_name)){
-        lock_release(&filesys_lock);
         f->eax=true;
     }else{ 
-        lock_release(&filesys_lock);
         f->eax=false;
     }
     return;
@@ -593,14 +587,11 @@ validate_string(const char * str){
     // printf("file_name ptr %p\n%s\n",file_name,file_name);
     // printf("file name: %s\n", file_name);
 
-    lock_acquire(&filesys_lock);
     struct file * file_ptr=filesys_open(file_name);
 
     if(file_ptr!=NULL){
-       lock_release(&filesys_lock);
        f->eax=process_add_file(file_ptr);
     }else{
-       lock_release(&filesys_lock);
        f->eax=-1;
     } 
     return;
@@ -627,14 +618,12 @@ validate_string(const char * str){
     int fd =get_four_bytes_user(f->esp+4);
     int file_size; 
     struct file *file_ptr;
-    lock_acquire(&filesys_lock);
     file_ptr=process_get_file(fd);
     if(file_ptr==NULL){
        f->eax=-1;
     }else{
        f->eax=file_length(file_ptr);//form filesys/file.h     
     } 
-    lock_release(&filesys_lock);
     return;
   }
 
@@ -653,7 +642,6 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
 
     // printf("%s\n", "read syscall !");
-    printf ("esp : %p\n", f->esp);
     // retrieve fd
     int fd =get_four_bytes_user(f->esp+4);
 
@@ -662,7 +650,6 @@ validate_string(const char * str){
 
     //retrieve size
     unsigned size = get_four_bytes_user(f->esp+12);
-    printf ("esp : %p\n", f->esp);
     ///////////////////////////////////////////////////////////////////////
     // validate user-provided buffer
     if(!is_user_vaddr(buffer_ptr + size-1)||get_user(buffer_ptr+size-1)==-1){
@@ -670,7 +657,6 @@ validate_string(const char * str){
       exit_on_error();
       return;
     }
-    printf ("esp : %p\n", f->esp);
     /////////////////////////////////////////////////////////////////////
     if(fd==STDIN_FILENO){
         int i;
@@ -682,7 +668,6 @@ validate_string(const char * str){
     }else if(fd==STDOUT_FILENO){
         f->eax=-1;//can't write to stdout
     }else{
-        lock_acquire(&filesys_lock);
         struct file *file_ptr=process_get_file(fd);
         if(file_ptr==NULL){
             f->eax=-1;
@@ -690,7 +675,6 @@ validate_string(const char * str){
             int bytes=file_read(file_ptr,buffer_ptr,size);
             f->eax=bytes;
         }
-        lock_release(&filesys_lock);
     }
     return;
   }
@@ -746,7 +730,6 @@ validate_string(const char * str){
         //error - can't write to STDIN
         f->eax=-1;
       }else{
-        lock_acquire(&filesys_lock);
         struct file *file_ptr=process_get_file(fd);
         if(file_ptr==NULL){
             f->eax=-1;
@@ -754,7 +737,6 @@ validate_string(const char * str){
             int bytes=file_write(file_ptr,buffer_ptr,size);
             f->eax=bytes;
         }
-        lock_release(&filesys_lock);
         
       }
     }else{
@@ -795,7 +777,6 @@ validate_string(const char * str){
     // retrieve position 
     unsigned position =get_four_bytes_user(f->esp+8);
     
-    lock_acquire(&filesys_lock);
     struct file *file_ptr=process_get_file(fd);
     if(file_ptr==NULL){
         f->eax=-1;
@@ -803,7 +784,6 @@ validate_string(const char * str){
         file_seek(file_ptr,position);
         f->eax=position;
     }
-    lock_release(&filesys_lock);
 
     return;
   }
@@ -827,7 +807,6 @@ validate_string(const char * str){
     // retrieve fd
     int fd = get_four_bytes_user(f->esp+4);
     
-    lock_acquire(&filesys_lock);
     struct file * file_ptr=process_get_file(fd);
     if(file_ptr==NULL){
         f->eax=-1;
@@ -835,7 +814,6 @@ validate_string(const char * str){
         off_t offset=file_tell(file_ptr);
         f->eax=offset;
     }
-    lock_release(&filesys_lock);
     return;
   }
 
@@ -858,8 +836,6 @@ validate_string(const char * str){
     
     // retrieve fd
     int fd =get_four_bytes_user(f->esp+4);
-    lock_acquire(&filesys_lock);
     f->eax=process_close_file(fd);
-    lock_release(&filesys_lock);
     return;
   }

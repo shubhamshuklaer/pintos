@@ -136,11 +136,7 @@ bool load_spte(struct supp_page_table_entry *spte){
     switch(spte->type){
         case SPTE_FS : ;//this is an empty statement as a label can only be part of a statement and a declaration is not a statement
             struct file *file;
-            if(!&filesys_lock)
-                lock_init(&filesys_lock);
-            lock_acquire(&filesys_lock);
             file = filesys_open (spte->file_name);
-            lock_release(&filesys_lock);
             if(!file){
                 vm_free_frame(kpage);
                 return false;
