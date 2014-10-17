@@ -364,7 +364,6 @@ intr_handler (struct intr_frame *frame)
     // printf("stack ptr: %p\n", frame->esp);
     // printf("vector no.  0x%02x\n", frame->vec_no);
 
-    thread_current()->esp_initial = frame->esp;
   }
 
   /* Invoke the interrupt's handler. */

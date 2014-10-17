@@ -16,6 +16,10 @@
   #include "userprog/pagedir.h"
   #include "filesys/directory.h"
 
+
+typedef int mapid_t;
+
+
 /* Reads a byte at user virtual address UADDR.
 UADDR must be below PHYS_BASE.
 Returns the byte value if successful, -1 if a segfault
@@ -145,6 +149,8 @@ validate_string(const char * str){
   void seek (struct intr_frame *f);
   void tell (struct intr_frame *f);
   void close (struct intr_frame *f);
+  void mmap (struct intr_frame *f);
+  void munmap (struct intr_frame *f);
 
   syscall_init (void) 
   {
@@ -204,6 +210,9 @@ validate_string(const char * str){
     // hex_dump(f->esp, f->esp, PHYS_BASE - f->esp, 1);
     // printf("\n-----------------------------------\n");
 
+
+    // thread_current()->esp_initial = f->esp;
+
     int sys_call_num=get_four_bytes_user(f->esp); 
     // printf("ptr: %p\n", ptr);
     // printf("%d\n", *ptr);
@@ -247,13 +256,18 @@ validate_string(const char * str){
       case SYS_CLOSE:
         close(f);
         break;
+      case SYS_MMAP:
+        mmap(f);
+        break;
+      case SYS_MUNMAP:
+        munmap(f);
+        break;
       default:
         // printf ("unknown system call!\n");
         exit_on_error();
         break;
     }
 
-    
     // f->esp = f->eip;
     
     // thread_exit ();
@@ -838,4 +852,49 @@ validate_string(const char * str){
     int fd =get_four_bytes_user(f->esp+4);
     f->eax=process_close_file(fd);
     return;
+  }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+  /*
+
+  mapid_t
+  mmap (int fd, void *addr)
+  {
+    return syscall2 (SYS_MMAP, fd, addr);
+  }
+
+  */
+
+  void mmap (struct intr_frame *f){
+
+    // get fd
+    int fd =get_four_bytes_user(f->esp+4);
+    printf("fd: %d\n", fd);
+    
+    // get addr
+    void *addr = get_four_bytes_user(f->esp+8);
+    printf("addr: %p\n", addr);
+  
+  }
+  
+
+  /*
+
+  void
+  munmap (mapid_t mapid)
+  {
+    syscall1 (SYS_MUNMAP, mapid);
+  }
+
+  */
+
+  void munmap (struct intr_frame *f){
+
+    // get map id
+    mapid_t map_id =get_four_bytes_user(f->esp+4);
+    printf("map id: %d\n", map_id);
+
+
   }

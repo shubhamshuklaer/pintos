@@ -158,7 +158,7 @@ page_fault (struct intr_frame *f)
 
 
 #ifdef VM  
-  	printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+  	// printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
 	if(not_present){
 		if(!is_user_vaddr(fault_addr))
 			goto done;
@@ -168,15 +168,24 @@ page_fault (struct intr_frame *f)
 			return;      
 
 		// check for stack access
-		printf("Fault address: %p\n", fault_addr);
+		// printf("Fault address: %p\n", fault_addr);
+
+    // check whether stack growth required
 		if(fault_addr >= f->esp - STACK_UNDERFLOW){
-			printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
-			// stack growth required
+			// printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+			
 			if(grow_stack(fault_addr)){
 				// printf("stack growth successful\n");
 				return;
 			}
 		}
+    // lazy loading
+    else{
+      if(grow_stack(fault_addr)){
+        // printf("stack growth successful\n");
+        return;
+      }
+    }
 
 	}
 #endif
