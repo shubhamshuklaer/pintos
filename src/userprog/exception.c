@@ -157,24 +157,37 @@ page_fault (struct intr_frame *f)
   user = (f->error_code & PF_U) != 0;
 
 
-  #ifdef VM  
-  if(not_present){
-     if(!is_user_vaddr(fault_addr))
-        goto done;
-     struct supp_page_table_entry *spte;
-     spte=lookup_supp_page_table(pg_round_down(fault_addr));
-     if(spte!=NULL&&load_spte(spte))
-        return;      
-  }
+#ifdef VM  
+  	printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+	if(not_present){
+		if(!is_user_vaddr(fault_addr))
+			goto done;
+		struct supp_page_table_entry *spte;
+		spte=lookup_supp_page_table(pg_round_down(fault_addr));
+		if(spte!=NULL&&load_spte(spte))
+			return;      
+
+		// check for stack access
+		printf("Fault address: %p\n", fault_addr);
+		if(fault_addr >= f->esp - STACK_UNDERFLOW){
+			printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+			// stack growth required
+			if(grow_stack(fault_addr)){
+				// printf("stack growth successful\n");
+				return;
+			}
+		}
+
+	}
 #endif
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  // printf ("Page fault at %p: %s error %s page in %s context.\n",
-  //         fault_addr,
-  //         not_present ? "not present" : "rights violation",
-  //         write ? "writing" : "reading",
-  //         user ? "user" : "kernel");
+  	printf ("Page fault at %p: %s error %s page in %s context.\n",
+		fault_addr,
+		not_present ? "not present" : "rights violation",
+		write ? "writing" : "reading",
+		user ? "user" : "kernel");
 done :
   if(!user){
      //printf("Kernel page fault!\n");

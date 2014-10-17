@@ -128,7 +128,7 @@ bool load_spte(struct supp_page_table_entry *spte){
         return false;
     if(spte->is_loaded)
         return false;
-    //printf("upaage %p\n",spte->u_vaddr);
+    // printf("upage %p\n",spte->u_vaddr);
     uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
     if (kpage == NULL)
        return false;
@@ -144,7 +144,7 @@ bool load_spte(struct supp_page_table_entry *spte){
             int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
             if (bytes_read != (int) spte->read_bytes){
                 vm_free_frame(kpage);
-                //printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+                // printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
                 file_close(file);
                 return false; 
             }
@@ -190,4 +190,22 @@ unsigned spt_hash_func (const struct hash_elem *e, void *aux){
 
 static unsigned spt_hash_u_vaddr(void * u_vaddr){
    return hash_int((int)u_vaddr);
+}
+
+bool 
+grow_stack(void *u_vaddr){
+  u_vaddr = pg_round_down (u_vaddr);
+  
+  // printf("growing stack\n");
+  spte_install_zero(u_vaddr,1);
+
+  // printf("spte installed\n");
+  
+  struct supp_page_table_entry * spte = lookup_supp_page_table(u_vaddr);
+  
+  // printf("spte found\n");
+  
+  load_spte(spte);
+  // printf("spte loaded\n");
+  return true;
 }
