@@ -223,6 +223,8 @@ process_exit (void)
   }
   
 #ifdef VM
+  enum intr_level old_level;
+  old_level = intr_disable ();
   free_process_resources();
 #endif  
   
@@ -246,7 +248,9 @@ process_exit (void)
       pagedir_destroy (pd);
     }
     // printf("process exited\n");
-    
+#ifdef VM
+  intr_set_level (old_level);
+#endif
 }
 
 
@@ -370,14 +374,8 @@ load (const char *cmdline, void (**eip) (void), void **esp)
   file_name = strtok_r ((char *)cmdline, " ,;", &save_ptr);
   //printf("name of file : %s\n", file_name);
 
-  if(!&filesys_lock){
-    // printf("no filesys lock yet\n");
-    lock_init(&filesys_lock);
-  }
-  lock_acquire(&filesys_lock);
   // printf("filesys lock acquired\n");
   file = filesys_open (file_name);
-  lock_release(&filesys_lock);
 
   if (file == NULL) 
     {
@@ -632,13 +630,23 @@ setup_stack (void **esp, const char *cmdline)
   uint8_t *kpage;
   bool success = false;
 #ifdef VM
-  kpage = vm_alloc_frame(PAL_USER | PAL_ZERO, ((uint8_t *) PHYS_BASE) - PGSIZE);
+struct supp_page_table_entry *spte=NULL;
+ if(spte_install_zero(((uint8_t *) PHYS_BASE) - PGSIZE,true)){
+    spte=lookup_supp_page_table(((uint8_t *) PHYS_BASE) - PGSIZE);
+    if(spte!=NULL)
+        success=load_spte(spte);
+    else
+        return false;
+ }else{
+     return false;
+ }
 #else
   kpage = palloc_get_page(PAL_USER | PAL_ZERO );
-#endif
   // printf("%s\n", "got page");
   if (kpage != NULL) {
     success = install_page (((uint8_t *) PHYS_BASE) - PGSIZE, kpage, true);
+  }
+#endif
     if (success){
       // printf("%s\n", "building stack");
       *esp = PHYS_BASE;
@@ -723,15 +731,15 @@ setup_stack (void **esp, const char *cmdline)
       free(argv);
     
     // printf("%s\n", "building stack 8");
-    }else{
+    }
+    else{
 #ifdef VM
-          vm_free_frame(kpage);
+          remove_spte(spte);
 #else
           palloc_free_page(kpage);
 #endif
       // printf("%s\n", "building stack 9");
     }
-  }
   // printf("\n\n%s\n\n", "dumping");
   // hex_dump(*esp, *esp, PHYS_BASE - *esp, 1);
 

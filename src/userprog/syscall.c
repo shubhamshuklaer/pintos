@@ -268,6 +268,7 @@ validate_string(const char * str){
         break;
     }
 
+    
     // f->esp = f->eip;
     
     // thread_exit ();

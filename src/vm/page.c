@@ -104,7 +104,7 @@ bool spte_install_mmap(void * u_vaddr, struct file * f,off_t offset,
    spte->offset=offset;
    spte->read_bytes=read_bytes;
    spte->zero_bytes=zero_bytes;
-   spte->type=SPTE_FS;
+   spte->type=SPTE_MMAP;
    spte->is_loaded=false;
    spte->k_vaddr=NULL;
    spte->swap_page=-1;
@@ -124,12 +124,22 @@ bool spte_install_mmap(void * u_vaddr, struct file * f,off_t offset,
     
 }
 
+void remove_spte(struct supp_page_table_entry *spte){
+   if(spte==NULL)
+       return;
+   hash_delete(&thread_current()->supp_page_table,&spte->elem); 
+   destroy_spte(&spte->elem,NULL);
+}
 
 
 void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    struct supp_page_table_entry *spte=hash_entry(e,struct supp_page_table_entry,elem);
    if(spte->is_loaded){
        vm_free_frame(spte->k_vaddr);  
+   }else{
+       if(spte->type==SPTE_SWAP){
+           swap_remove(spte->swap_page);
+       }
    }
    free(spte->file_name);
    free(spte);
@@ -143,51 +153,59 @@ void free_process_resources(){
 
 
 struct supp_page_table_entry * lookup_supp_page_table(void * u_vaddr){
+    struct thread * t=thread_current();
+    return lookup_spt_of_thread(u_vaddr,t);
+}
+
+struct supp_page_table_entry * lookup_spt_of_thread(void * u_vaddr,struct thread * t){
     struct hash_elem *elem;
     struct list *bucket;
-    struct thread * t=thread_current();
     bucket=hash_find_bucket(&t->supp_page_table,spt_hash_u_vaddr(u_vaddr));
     struct list_elem *i;
-    bool found=false;
-    struct supp_page_table_entry *spte;
+    struct supp_page_table_entry *spte_temp,*spte=NULL;
     for (i = list_begin (bucket); i != list_end (bucket); i = list_next (i)){
         elem = list_elem_to_hash_elem (i);
-        spte=hash_entry(elem,struct supp_page_table_entry,elem);
-        if(spte->u_vaddr==u_vaddr){
-            found=true;
+        spte_temp=hash_entry(elem,struct supp_page_table_entry,elem);
+        if(spte_temp->u_vaddr==u_vaddr){
+            spte=spte_temp;
             break;
         }
     }
-    if(found)
-       return spte;
-    else
-       return NULL; 
+    return spte;
+
 
 }
 
-
 bool load_spte(struct supp_page_table_entry *spte){
-    if(!spte)
+    if(!spte){
+        printf("spte null\n");
         return false;
-    if(spte->is_loaded)
+    }
+    if(spte->is_loaded){
+        printf("spte already loaded\n");
         return false;
-    // printf("upage %p\n",spte->u_vaddr);
+    }
+    //printf("upaage %p\n",spte->u_vaddr);
     uint8_t *kpage = vm_alloc_frame( PAL_USER ,spte->u_vaddr);
-    if (kpage == NULL)
-       return false;
-    int bytes_read;    
+    if (kpage == NULL){
+        printf("Page allocation failed\n");
+        return false;
+    }
+    
     switch(spte->type){
         case SPTE_FS : ;//this is an empty statement as a label can only be part of a statement and a declaration is not a statement
             struct file *file;
             file = filesys_open (spte->file_name);
             if(!file){
+                printf("file open failed\n");
                 vm_free_frame(kpage);
                 return false;
             }
-            bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
+            int bytes_read=file_read_at(file, kpage, spte->read_bytes,spte->offset);
             if (bytes_read != (int) spte->read_bytes){
+                printf("Bytes read less than expected\n");
                 vm_free_frame(kpage);
-                // printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
+                //printf("bytes read %d \t bytes should be read %d \n",bytes_read,spte->read_bytes);
                 file_close(file);
                 return false; 
             }
@@ -206,12 +224,18 @@ bool load_spte(struct supp_page_table_entry *spte){
             }
             memset(kpage + spte->read_bytes, 0, spte->zero_bytes);
             break;
+        case SPTE_SWAP:
+            if(!swap_in(spte->swap_page,kpage))
+                PANIC("could not load from swap");
+            break;
         default :
+            printf("Unknown spte type\n");
             vm_free_frame(kpage);
             return false;
     }
     // Add the page to the process's address space
     if (!install_page (spte->u_vaddr, kpage,spte->writable)) {
+          printf("page install failed");
           vm_free_frame(kpage);
           return false; 
     }

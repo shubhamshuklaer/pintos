@@ -4,6 +4,7 @@
 #include <hash.h>
 #include "filesys/file.h"
 #include <stdio.h>
+#include "threads/thread.h"
 
 #define STACK_MAX_SIZE 30
 
@@ -64,5 +65,6 @@ bool grow_stack(void *u_vaddr);
 bool spte_install_mmap(void * u_vaddr, struct file * f,off_t offset,
         uint32_t read_bytes, uint32_t zero_bytes,bool writable);
 
+struct supp_page_table_entry * lookup_spt_of_thread(void * u_vaddr,struct thread * t);
 
 #endif /* vm/page.h */

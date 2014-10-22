@@ -7,6 +7,7 @@
 #include "threads/io.h"
 #include "threads/interrupt.h"
 #include "threads/synch.h"
+#include "threads/malloc.h"
 
 /* The code in this file is an interface to an ATA (IDE)
    controller.  It attempts to comply to [ATA-3]. */
@@ -48,35 +49,6 @@
 #define CMD_READ_SECTOR_RETRY 0x20      /* READ SECTOR with retries. */
 #define CMD_WRITE_SECTOR_RETRY 0x30     /* WRITE SECTOR with retries. */
 
-/* An ATA device. */
-struct disk 
-  {
-    char name[8];               /* Name, e.g. "hd0:1". */
-    struct channel *channel;    /* Channel disk is on. */
-    int dev_no;                 /* Device 0 or 1 for master or slave. */
-
-    bool is_ata;                /* 1=This device is an ATA disk. */
-    disk_sector_t capacity;     /* Capacity in sectors (if is_ata). */
-
-    long long read_cnt;         /* Number of sectors read. */
-    long long write_cnt;        /* Number of sectors written. */
-  };
-
-/* An ATA channel (aka controller).
-   Each channel can control up to two disks. */
-struct channel 
-  {
-    char name[8];               /* Name, e.g. "hd0". */
-    uint16_t reg_base;          /* Base I/O port. */
-    uint8_t irq;                /* Interrupt in use. */
-
-    struct lock lock;           /* Must acquire to access the controller. */
-    bool expecting_interrupt;   /* True if an interrupt is expected, false if
-                                   any interrupt would be spurious. */
-    struct semaphore completion_wait;   /* Up'd by interrupt handler. */
-
-    struct disk devices[2];     /* The devices on this channel. */
-  };
 
 /* We support the two "legacy" ATA channels found in a standard PC. */
 #define CHANNEL_CNT 2
@@ -220,7 +192,7 @@ void
 disk_read (struct disk *d, disk_sector_t sec_no, void *buffer) 
 {
   struct channel *c;
-  
+  void *temp_buffer=malloc(DISK_SECTOR_SIZE+1);
   ASSERT (d != NULL);
   ASSERT (buffer != NULL);
 
@@ -231,9 +203,13 @@ disk_read (struct disk *d, disk_sector_t sec_no, void *buffer)
   sema_down (&c->completion_wait);
   if (!wait_while_busy (d))
     PANIC ("%s: disk read failed, sector=%"PRDSNu, d->name, sec_no);
-  input_sector (c, buffer);
+  input_sector (c, temp_buffer);//first we will store it in the kernel space and then copy it in user space
+  // this is because if writing to buffer needs a page to be loaded from file_system then it will
+  // call disk_read again which will cause problem lock_held_by_current_thread..!!
   d->read_cnt++;
   lock_release (&c->lock);
+  memcpy(buffer,temp_buffer,DISK_SECTOR_SIZE);
+  free(temp_buffer);
 }
 
 /* Write sector SEC_NO to disk D from BUFFER, which must contain

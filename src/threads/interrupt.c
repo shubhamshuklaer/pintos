@@ -84,7 +84,6 @@ intr_enable (void)
 {
   enum intr_level old_level = intr_get_level ();
   ASSERT (!intr_context ());
-
   /* Enable interrupts by setting the interrupt flag.
 
      See [IA32-v2b] "STI" and [IA32-v3a] 5.8.1 "Masking Maskable

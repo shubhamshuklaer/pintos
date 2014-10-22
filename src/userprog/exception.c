@@ -179,24 +179,17 @@ page_fault (struct intr_frame *f)
 				return;
 			}
 		}
-    // lazy loading
-    else{
-      if(grow_stack(fault_addr)){
-        // printf("stack growth successful\n");
-        return;
-      }
     }
 
-	}
 #endif
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to
      which fault_addr refers. */
-  	printf ("Page fault at %p: %s error %s page in %s context.\n",
-		fault_addr,
-		not_present ? "not present" : "rights violation",
-		write ? "writing" : "reading",
-		user ? "user" : "kernel");
+  // printf ("Page fault at %p: %s error %s page in %s context.\n",
+  //         fault_addr,
+  //         not_present ? "not present" : "rights violation",
+  //         write ? "writing" : "reading",
+  //         user ? "user" : "kernel");
 done :
   if(!user){
      //printf("Kernel page fault!\n");

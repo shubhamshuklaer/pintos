@@ -38,6 +38,7 @@
 #endif
 #ifdef VM
 #include "vm/frame.h"
+#include "vm/swap.h"
 #endif
 
 /* Amount of physical memory, in 4 kB pages. */
@@ -111,9 +112,6 @@ main (void)
   syscall_init ();
 #endif
 
-#ifdef VM
-  frame_table_init();
-#endif
 
   /* Start thread scheduler and enable interrupts. */
   thread_start ();
@@ -127,6 +125,10 @@ main (void)
   lock_init(&filesys_lock);
 #endif
 
+#ifdef VM
+  frame_table_init();
+  swap_init();
+#endif
   printf ("Boot complete.\n");
   
   /* Run actions specified on kernel command line. */

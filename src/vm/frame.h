@@ -6,12 +6,14 @@
 #include "vm/page.h"
 #include <hash.h>
 #include <stdio.h>
+#include <debug.h>
 
 struct frame_table_entry{
     void * k_vaddr;//kernel virtual address for the frame..!!
     void * u_vaddr;//user virtual address to which frame belongs..!!
     struct thread * owner; 
     struct hash_elem elem;
+    int access_history;
 };
 
 //initilizes the frame table..!!
@@ -21,6 +23,9 @@ void frame_table_init();
 //allocates a frame form user pool flags must contain PAL_USER 
 void * vm_alloc_frame(enum palloc_flags flags,void *u_vaddr);
 void vm_free_frame(void *frame );
+void * vm_evict_frame();
+void frame_tick();
+void update_accessed_history(struct hash_elem *h,void *aux UNUSED);
 
 //hash functions..!! Frame table is a hash..!!
 bool ft_less_func (const struct hash_elem *a,const struct hash_elem *b,void *aux);
