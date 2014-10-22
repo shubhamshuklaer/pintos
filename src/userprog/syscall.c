@@ -868,16 +868,102 @@ validate_string(const char * str){
 
   */
 
-  void mmap (struct intr_frame *f){
 
+  void mmap (struct intr_frame *f){
     // get fd
     int fd =get_four_bytes_user(f->esp+4);
-    printf("fd: %d\n", fd);
-    
+   // printf("esp: %p\n",(f->esp));
+    //printf("fd: %d\n", fd);
+    if(process_get_file(fd)==NULL)
+    {
+      f->eax = -1;
+      return;
+    }
     // get addr
     void *addr = get_four_bytes_user(f->esp+8);
-    printf("addr: %p\n", addr);
+    struct file *fil = process_get_file(fd);
+    unsigned int size = file_length(fil);
+    unsigned int addr2  = addr;
+    unsigned int intial = addr2;
+    unsigned int limit = addr2 + size;
+    off_t off = 0;
+    struct supp_page_table_entry *spte ;
+    int error = 0;
+    while(addr2<=limit)
+    {
+      spte = lookup_supp_page_table(addr2);
+      if(spte != NULL)
+        error = 1;
+      addr2  = addr2 + PGSIZE;
+    }
+    //printf("kya hua entere hua %d",error);
+    if(error == 1)
+    {
+     // printf("entered kya ?");
+      f->eax = -1;
+      return;
+    }
+    addr2 = addr;
+    intial = addr2;
+    limit = addr2 + size;
+    off = 0;
+    spte = NULL;
+    //printf("size of file is %u %u",size,fil);
+    if(size==0)
+    {
+      f->eax = -1;
+      return;
+    }
+    if(pg_round_down(addr) != addr)
+    {
+      f->eax = -1;
+      return;
+    }
+    if(addr == 0)
+    {
+      f->eax = -1;
+      return;
+    }
+    //printf("all test pass for -1");
+    
+    int vc = process_map_file(fil,addr2,size);
+    
+
+
+    while(addr2 < limit)
+    {
   
+      if(addr2+PGSIZE <= limit)
+      {
+         // printf("%u %u %u %u %u %u",addr2,fil,off,PGSIZE,0,true);
+         spte_install_mmap(addr2,fil,off,PGSIZE,0,true);
+         spte = lookup_supp_page_table(pg_round_down(addr2));  
+      } 
+      else
+      {
+        // printf("%u\n",size);
+        // printf("%u %u %u %u %u %u",addr2,fil,off,size%PGSIZE,PGSIZE-(size%PGSIZE),true);
+        spte_install_mmap(addr2,fil,off,size%PGSIZE,PGSIZE-(size%PGSIZE),true);
+        spte = lookup_supp_page_table(pg_round_down(addr2));
+      }
+      if(spte!=NULL&&load_spte(spte))
+      {
+        off = off + PGSIZE;
+        addr2 = addr2+PGSIZE;
+      }
+      else
+      {
+         process_unmap_file(vc-1);
+     //    printf("asd\n");
+         f->eax = -1;
+      //   printf("returning\n");
+         return;
+      }
+    }
+
+    addr2  = addr;
+    f->eax = vc-1;
+    return;
   }
   
 
@@ -895,7 +981,10 @@ validate_string(const char * str){
 
     // get map id
     mapid_t map_id =get_four_bytes_user(f->esp+4);
-    printf("map id: %d\n", map_id);
+    //printf("unmap map id: %d\n", map_id);
 
-
+    int vc=process_unmap_file(map_id);
+    //printf("\n%d\n",vc);
+    f->eax = vc;
+    return;
   }

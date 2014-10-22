@@ -120,6 +120,7 @@
     lock_init (&tid_lock);
     list_init (&all_list);
     list_init (&sleep_list);
+
     /* Set up a thread structure for the running thread. */
     // printf("thread init 1\n");
     initial_thread = running_thread ();
@@ -130,6 +131,7 @@
     // printf("thread init 4\n");
     initial_thread->tid = allocate_tid ();
     // printf("thread init exit\n");
+   
     
     // printf("++ init sema for: '%s' to 0\n", initial_thread->name);
 
@@ -623,6 +625,8 @@
     //For file handling
     list_init(&(t->file_list));
     t->fd=2;
+    list_init(&(t->file_mapping_list));
+    t->map_id = 2;
 #ifdef USERPROG
     if(running_thread()->status==THREAD_RUNNING){
         t->parent = thread_current();

@@ -111,6 +111,9 @@ struct thread
     struct list file_list;
     int fd;
 
+    /* file mapping handling*/
+    struct list file_mapping_list;
+    int map_id;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */

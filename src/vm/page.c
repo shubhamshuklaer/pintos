@@ -141,7 +141,11 @@ void destroy_spte(struct hash_elem *e, void *aux UNUSED){
            swap_remove(spte->swap_page);
        }
    }
-   free(spte->file_name);
+
+   if(spte->file_name!=NULL) //may be mmap..
+   {
+    free(spte->file_name);
+   }
    free(spte);
 }
 

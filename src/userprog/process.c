@@ -783,6 +783,55 @@ int process_add_file(struct file * file_ptr){
 
 }
 
+int process_map_file(struct file * file_ptr,unsigned int starting_pos, unsigned int size)
+{
+  //printf("here2");
+  struct mapping_file *pf =(struct mapping_file *)malloc(sizeof(struct mapping_file));
+  struct thread *t = thread_current();
+  if(pf==NULL)
+    return -1;
+  pf->file = file_ptr;
+  pf->map_id = t->map_id;
+  pf->s_uaddress = starting_pos;
+  pf->size = size;
+  t->map_id++;
+
+  list_push_back(&(t->file_mapping_list),&(pf->elem));
+  return t->map_id;
+}
+
+int process_unmap_file(int map_id)
+{
+ // printf("started unmapping\n");
+  struct list_elem *e;
+  struct thread *t = thread_current();
+  struct mapping_file *mf;
+  for(e=list_begin(&t->file_mapping_list);t!=list_end(&t->file_mapping_list);e=list_next(e))
+  {
+    mf = list_entry(e,struct mapping_file,elem);
+    if(mf->map_id == map_id){
+      {
+        // printf("map id found \n");
+          struct supp_page_table_entry *spte;
+          unsigned int st  = mf->s_uaddress;
+          while(st < mf->size+mf->s_uaddress)
+          {
+            spte=lookup_supp_page_table(st);
+           // printf("%p\n",&spte->elem);
+            if(spte!=NULL)
+                remove_spte(spte);
+            st = st+PGSIZE;
+          }
+          spte = lookup_supp_page_table(pg_round_down(mf->size+mf->s_uaddress));
+          if(spte!=NULL)
+            remove_spte(spte);
+          return map_id;  
+      }
+    }
+  }
+  return -1;
+}
+
 struct file * process_get_file(int fd){
   struct list_elem *e;
   struct thread *t=thread_current();
