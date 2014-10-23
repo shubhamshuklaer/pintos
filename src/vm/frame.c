@@ -61,7 +61,14 @@ void frame_tick(){
         //external intrrupts cannot acquire loacks
         //no problem though as interrupt is disabled
         //we just need to check if anyone else is editing the table
-        hash_apply(&frame_table,&update_accessed_history);    
+        if(thread_current()->exit_lock.holder==NULL){ 
+            if(lock_try_acquire(&thread_current()->exit_lock)){
+                //so that the process in currently not in exit part
+                //couldn't use lock_try_acqire directly because ASSERT(!lock_held_by_current_thread)  
+                hash_apply(&frame_table,&update_accessed_history); 
+                lock_release(&thread_current()->exit_lock);
+            }   
+        }
     }
 }
 

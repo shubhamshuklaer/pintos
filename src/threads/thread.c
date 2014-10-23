@@ -641,7 +641,9 @@
     sema_init(&(t->parent_wait), 0);
     t->num_child_procs = 0;
 #endif
- 
+#ifdef VM
+    lock_init(&t->exit_lock);
+#endif 
   }
 
   /* Allocates a SIZE-byte frame at the top of thread T's stack and

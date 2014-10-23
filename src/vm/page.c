@@ -132,9 +132,15 @@ void remove_spte(struct supp_page_table_entry *spte){
 }
 
 void write_page_to_fs(struct supp_page_table_entry *spte){
+    int bytes_wrote;
     if(spte->file_name!=NULL){
+        struct file *f=filesys_open(spte->file_name);
+        if(f!=NULL){
+            bytes_wrote=file_write_at(f,spte->u_vaddr,PGSIZE,spte->offset) ;
+            file_close(f);
+        }
     }else if(spte->file_ptr!=NULL){
-        int bytes_wrote=file_write_at (spte->file_ptr,spte->u_vaddr,PGSIZE,spte->offset) ;
+        bytes_wrote=file_write_at (spte->file_ptr,spte->u_vaddr,PGSIZE,spte->offset) ;
     }
 
 }
@@ -150,7 +156,13 @@ void destroy_spte(struct hash_elem *e, void *aux UNUSED){
        vm_free_frame(spte->k_vaddr);  
    }else{
        if(spte->type==SPTE_SWAP){
-           swap_remove(spte->swap_page);
+            if(pagedir_is_dirty(thread_current()->pagedir,spte->u_vaddr)){
+                if(load_spte(spte)){
+                    write_page_to_fs(spte); 
+                }
+            }else{
+                swap_remove(spte->swap_page);
+            }
        }
    }
 

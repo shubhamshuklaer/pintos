@@ -131,6 +131,7 @@ struct thread
 #endif
 #ifdef VM
     struct hash supp_page_table;
+    struct lock exit_lock;
 #endif
     void *esp_initial;
     /* Owned by thread.c. */

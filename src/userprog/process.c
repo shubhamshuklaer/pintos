@@ -223,8 +223,7 @@ process_exit (void)
   }
   
 #ifdef VM
-  enum intr_level old_level;
-  old_level = intr_disable ();
+  lock_acquire(&child_thread->exit_lock);
   free_process_resources();
 #endif  
   
@@ -249,7 +248,7 @@ process_exit (void)
     }
     // printf("process exited\n");
 #ifdef VM
-  intr_set_level (old_level);
+  lock_release(&child_thread->exit_lock);
 #endif
 }
 
