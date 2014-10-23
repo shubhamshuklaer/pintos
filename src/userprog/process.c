@@ -783,6 +783,7 @@ int process_add_file(struct file * file_ptr){
 
 }
 
+#ifdef VM
 int process_map_file(struct file * file_ptr,unsigned int starting_pos, unsigned int size)
 {
   //printf("here2");
@@ -831,6 +832,7 @@ int process_unmap_file(int map_id)
   }
   return -1;
 }
+#endif
 
 struct file * process_get_file(int fd){
   struct list_elem *e;

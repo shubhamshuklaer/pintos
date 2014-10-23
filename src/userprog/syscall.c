@@ -148,9 +148,10 @@ validate_string(const char * str){
   void seek (struct intr_frame *f);
   void tell (struct intr_frame *f);
   void close (struct intr_frame *f);
+#ifdef VM
   void mmap (struct intr_frame *f);
   void munmap (struct intr_frame *f);
-
+#endif
   syscall_init (void) 
   {
     intr_register_int (0x30, 3, INTR_ON, syscall_handler, "syscall");
@@ -255,12 +256,14 @@ validate_string(const char * str){
       case SYS_CLOSE:
         close(f);
         break;
+#ifdef VM
       case SYS_MMAP:
         mmap(f);
         break;
       case SYS_MUNMAP:
         munmap(f);
         break;
+#endif
       default:
         // printf ("unknown system call!\n");
         exit_on_error();
@@ -855,7 +858,7 @@ validate_string(const char * str){
   }
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
-
+#ifdef VM
 
   /*
 
@@ -987,3 +990,5 @@ validate_string(const char * str){
     f->eax = vc;
     return;
   }
+
+#endif

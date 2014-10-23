@@ -27,10 +27,10 @@ void process_activate (void);
 int process_add_file(struct file * file_ptr);
 struct file * process_get_file(int fd);
 int process_close_file(int fd);
-
+#ifdef VM
 int process_map_file(struct file * file_ptr,unsigned int starting_pos, unsigned int size);
 int process_unmap_file(int map_id);
-
+#endif
 
 bool install_page (void *upage, void *kpage, bool writable);
 
