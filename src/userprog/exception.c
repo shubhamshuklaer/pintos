@@ -171,14 +171,21 @@ page_fault (struct intr_frame *f)
 		// printf("Fault address: %p\n", fault_addr);
 
     // check whether stack growth required
-		if(fault_addr >= f->esp - STACK_UNDERFLOW){
-			// printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
-			
-			if(grow_stack(fault_addr)){
-				// printf("stack growth successful\n");
-				return;
-			}
-		}
+        void * esp;
+        if(user){
+            esp=f->esp;
+        }else{
+            esp=thread_current()->esp_initial;
+        }
+		if(fault_addr >= esp - STACK_UNDERFLOW){
+		    // printf("Fault @: %p,\tStack ptr: %p,\tInitial Stack ptr: %p\n", fault_addr, f->esp, thread_current()->esp_initial);
+            if(fault_addr>=(void *)(PHYS_BASE - STACK_MAX_SIZE)){
+	            if(grow_stack(fault_addr)){
+			        // printf("stack growth successful\n");
+			        return;
+		        }
+            }
+	   }
     }
 
 #endif

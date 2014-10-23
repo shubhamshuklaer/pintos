@@ -356,6 +356,7 @@ intr_handler (struct intr_frame *frame)
       in_external_intr = true;
       yield_on_return = false;
     }
+  thread_current()->esp_initial=frame->esp;
 
   // check for page fault and store the stack pointer
   if (frame->vec_no == 14){

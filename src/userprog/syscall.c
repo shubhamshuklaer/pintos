@@ -16,7 +16,6 @@
   #include "userprog/pagedir.h"
   #include "filesys/directory.h"
 
-
 typedef int mapid_t;
 
 
@@ -211,7 +210,7 @@ validate_string(const char * str){
     // printf("\n-----------------------------------\n");
 
 
-    // thread_current()->esp_initial = f->esp;
+    thread_current()->esp_initial = f->esp;
 
     int sys_call_num=get_four_bytes_user(f->esp); 
     // printf("ptr: %p\n", ptr);

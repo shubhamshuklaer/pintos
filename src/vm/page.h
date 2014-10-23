@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include "threads/thread.h"
 
-#define STACK_MAX_SIZE 30
+#define STACK_MAX_SIZE 8388608//8MB
 
 enum spte_type{
     SPTE_FS,//page in file system as a file
