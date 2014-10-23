@@ -131,10 +131,22 @@ void remove_spte(struct supp_page_table_entry *spte){
    destroy_spte(&spte->elem,NULL);
 }
 
+void write_page_to_fs(struct supp_page_table_entry *spte){
+    if(spte->file_name!=NULL){
+    }else if(spte->file_ptr!=NULL){
+        int bytes_wrote=file_write_at (spte->file_ptr,spte->u_vaddr,PGSIZE,spte->offset) ;
+    }
+
+}
+
+
 
 void destroy_spte(struct hash_elem *e, void *aux UNUSED){
    struct supp_page_table_entry *spte=hash_entry(e,struct supp_page_table_entry,elem);
    if(spte->is_loaded){
+       if(pagedir_is_dirty(thread_current()->pagedir,spte->u_vaddr)){
+           write_page_to_fs(spte); 
+       }
        vm_free_frame(spte->k_vaddr);  
    }else{
        if(spte->type==SPTE_SWAP){
