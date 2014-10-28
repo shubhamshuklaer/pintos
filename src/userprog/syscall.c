@@ -608,6 +608,13 @@ validate_string(const char * str){
 
     if(file_ptr!=NULL){
        f->eax=process_add_file(file_ptr);
+  
+      // deny write to executable
+      if((!file_ptr->deny_write) && validate_executable(file_ptr)){
+        // printf("denying\n");
+        file_deny_write(file_ptr);
+      }
+      file_ptr->pos = 0;
     }else{
        f->eax=-1;
     } 
@@ -751,6 +758,29 @@ validate_string(const char * str){
         if(file_ptr==NULL){
             f->eax=-1;
         }else{
+
+          // printf("deny_write_count: %d\n", file_ptr->inode->deny_write_cnt);
+          if(file_ptr->deny_write){
+            // printf("file denied to be written\n");
+
+            char *buffer_ptr_temp = malloc(size);
+            int bytes = file_read(file_ptr,buffer_ptr_temp,size);
+            if(bytes == size){
+              // check if both data same
+              int same = strncmp(buffer_ptr, buffer_ptr_temp);
+              if(same == 0){
+                // return  size without writing
+                f->eax = size;
+                return;
+              }
+            }else{
+
+            }
+            f->eax = 0;
+            return;
+          }else{
+            // printf("file permitted to be written\n");
+          }
             int bytes=file_write(file_ptr,buffer_ptr,size);
             f->eax=bytes;
         }

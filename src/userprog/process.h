@@ -30,8 +30,9 @@ int process_close_file(int fd);
 #ifdef VM
 int process_map_file(struct file * file_ptr,unsigned int starting_pos, unsigned int size);
 int process_unmap_file(int map_id);
-#endif
 
+#endif
+bool validate_executable(struct file *f);
 bool install_page (void *upage, void *kpage, bool writable);
 
 #endif /* userprog/process.h */

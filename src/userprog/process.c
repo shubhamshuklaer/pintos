@@ -488,6 +488,21 @@ load (const char *cmdline, void (**eip) (void), void **esp)
 
 /* load() helpers. */
 
+bool validate_executable(struct file *f){
+  struct Elf32_Ehdr ehdr;
+  if (file_read (f, &ehdr, sizeof ehdr) != sizeof ehdr
+      || memcmp (ehdr.e_ident, "\177ELF\1\1\1", 7)
+      || ehdr.e_type != 2
+      || ehdr.e_machine != 3
+      || ehdr.e_version != 1
+      || ehdr.e_phentsize != sizeof (struct Elf32_Phdr)
+      || ehdr.e_phnum > 1024) {
+    return false;
+  }else{
+    return true;
+  }
+}
+
 bool install_page (void *upage, void *kpage, bool writable);
 
 /* Checks whether PHDR describes a valid, loadable segment in

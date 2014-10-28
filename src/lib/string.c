@@ -87,6 +87,25 @@ strcmp (const char *a_, const char *b_)
   return *a < *b ? -1 : *a > *b;
 }
 
+int
+strncmp (const char *a_, const char *b_, int size) 
+{
+  const unsigned char *a = (const unsigned char *) a_;
+  const unsigned char *b = (const unsigned char *) b_;
+
+  ASSERT (a != NULL);
+  ASSERT (b != NULL);
+  int count = 0;
+  while (*a != '\0' && *a == *b && ++count <= size) 
+    {
+      a++;
+      b++;
+    }
+
+  return *a < *b ? -1 : *a > *b;
+}
+
+
 /* Returns a pointer to the first occurrence of CH in the first
    SIZE bytes starting at BLOCK.  Returns a null pointer if CH
    does not occur in BLOCK. */
